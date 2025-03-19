@@ -1,2 +1,10 @@
 module.exports.Token = require('./token.model');
 module.exports.User = require('./user.model');
+module.exports.Wallet = require('./wallet.model');
+module.exports.Transaction = require('./cryptoToken.model');
+module.exports.Balance = require('./balance.model');
+module.exports.WalletGenerationConfig = require('./walletGenerationConfig.model');
+module.exports.DistReturnConfig = require('./distReturnConfig.model');
+module.exports.SchedulerConfig = require('./schedulerConfig.model');
+module.exports.SchedulerLog = require('./schedulerLog.model');
+module.exports.WalletUsage = require('./walletUsage.model');

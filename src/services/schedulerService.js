@@ -1,0 +1,79 @@
+const SchedulerConfig = require('../models/schedulerConfig.model');
+const SchedulerLog = require('../models/schedulerLog.model');
+const { generateWalletsForConfig } = require('./walletGenerationService');
+const { distributeToActiveWallets } = require('./distributionService');
+const { returnAllFundsToMaster } = require('./returnService');
+const SchedulerTypes = require('../config/schedulerTypes');
+
+async function runSchedulerTask(schedulerName) {
+  // Find the scheduler configuration by name
+  const schedulerConfig = await SchedulerConfig.findOne({ name: schedulerName, enabled: true });
+  if (!schedulerConfig) {
+    console.log(`No scheduler config found for ${schedulerName}`);
+    return;
+  }
+  const startTime = new Date();
+  let affectedRows = 0;
+  let message = '';
+
+  try {
+    if (schedulerName === SchedulerTypes.WALLET_GENERATION) {
+      const WalletGenerationConfig = require('../models/walletGenerationConfig.model');
+      // Find all enabled wallet generation configurations (for all networks)
+      const walletGenConfigs = await WalletGenerationConfig.find({ enabled: true });
+      if (!walletGenConfigs || walletGenConfigs.length === 0) {
+        throw new Error('No enabled wallet generation configurations found.');
+      }
+
+      for (const config of walletGenConfigs) {
+        const generated = await generateWalletsForConfig(config);
+        console.log(`Generated ${generated} addresses for network ${config.chainId}`);
+        affectedRows += generated;
+      }
+      message = `Generated a total of ${affectedRows} addresses across ${walletGenConfigs.length} config(s).`;
+    } else if (schedulerName === SchedulerTypes.TOKEN_DISTRIBUTION) {
+      const DistReturnConfig = require('../models/distReturnConfig.model');
+      const distConfigs = await DistReturnConfig.find({ distributionEnabled: true }).populate('token');
+
+      for (const config of distConfigs) {
+        const count = await distributeToActiveWallets(config);
+        affectedRows += count || 0;
+      }
+
+      const returnConfigs = await DistReturnConfig.find({ returnEnabled: true }).populate('token');
+
+      for (const config of returnConfigs) {
+        const count = await returnAllFundsToMaster(config);
+        affectedRows += count || 0;
+      }
+    }
+
+    schedulerConfig.lastRun = startTime;
+    await schedulerConfig.save();
+    const endTime = new Date();
+    const log = new SchedulerLog({
+      schedulerConfig: schedulerConfig._id,
+      startTime,
+      endTime,
+      affectedRows,
+      message,
+      success: true, // Set to false if the task failed
+    });
+    await log.save();
+    console.log(`Scheduler task ${schedulerName} executed. ${message}`);
+  } catch (error) {
+    console.error(`Critical error in scheduler ${schedulerName}:`, error);
+
+    // Handle transaction-specific errors
+    if (error.name === 'MongoServerError' && error.code === 251) {
+      console.log('Transient transaction error detected, consider retrying');
+    }
+
+    // Add monitoring integration here
+    throw error;
+  }
+}
+
+module.exports = {
+  runSchedulerTask,
+};
