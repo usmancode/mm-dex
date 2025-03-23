@@ -45,7 +45,7 @@ async function getMasterWallet(provider, masterWalletId) {
 function createTransactionRecord(wallet, token, receipt, amount, isERC20 = false) {
   return {
     wallet: wallet._id,
-    token: token._id,
+    tokenA: token._id,
     amount: amount.toString(),
     transactionHash: receipt.hash,
     status: receipt.status === 1 ? 'success' : 'failed',
@@ -80,7 +80,7 @@ function applyGasBuffer(estimatedGas, fallback) {
  * - If leftover for the last address is outside [minAmount, maxAmount], throw an error.
  */
 function generateRandomAllocations(totalAmount, minAmount, maxAmount, count) {
-  const MAX_TRIES = 10;
+  const MAX_TRIES = 100;
 
   for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
     let allocations = [];
@@ -140,18 +140,18 @@ async function distributeToActiveWallets(distConfig) {
     const networkInfo = await provider.getNetwork();
     const chainId = networkInfo.chainId.toString();
 
-    if (distConfig.token.chainId.toString() !== chainId) {
-      throw new Error(`Chain ID mismatch: Config ${distConfig.token.chainId} vs Network ${chainId}`);
+    if (distConfig.tokenA.chainId.toString() !== chainId) {
+      throw new Error(`Chain ID mismatch: Config ${distConfig.tokenA.chainId} vs Network ${chainId}`);
     }
 
     // 2) Load token docs
-    const tokenDoc = await CryptoToken.findById(distConfig.token);
+    const tokenDoc = await CryptoToken.findById(distConfig.tokenA);
     if (!tokenDoc) {
       console.log('Token doc not found. Cannot distribute.');
       return 0;
     }
     const nativeTokenDoc = await CryptoToken.findOne({
-      chainId: distConfig.token.chainId,
+      chainId: distConfig.tokenA.chainId,
       isNative: true,
     });
     if (!nativeTokenDoc) {
@@ -198,7 +198,22 @@ async function distributeToActiveWallets(distConfig) {
     }
 
     // 5) Generate random allocations that sum exactly to the total amounts
+    console.log(
+      'totalNative, minNative, maxNative, targetWallets.length',
+      totalNative,
+      minNative,
+      maxNative,
+      targetWallets.length
+    );
     const nativeAllocations = generateRandomAllocations(totalNative, minNative, maxNative, targetWallets.length);
+    console.log(
+      'totalToken, minToken, maxToken, targetWallets.length',
+      totalToken,
+      minToken,
+      maxToken,
+      targetWallets.length
+    );
+
     const tokenAllocations = generateRandomAllocations(totalToken, minToken, maxToken, targetWallets.length);
 
     // 6) On-chain distribution

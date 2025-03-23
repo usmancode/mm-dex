@@ -15,6 +15,7 @@ const MAX_PRIORITY_FEE_GWEI = 3n;
 const FEE_MULTIPLIER = 15n; // 1.5x
 const FALLBACK_ETH_GAS = 21000n;
 const FALLBACK_ERC20_GAS = 100000n;
+const MIN_TRANSFER_BALANCE = 0.00001; // Minimum balance to transfer
 
 /**
  * Derive a child wallet from HD
@@ -32,7 +33,7 @@ async function getDerivedWallet(walletDoc) {
 function createTransactionRecord(wallet, token, receipt, amount, isERC20 = false) {
   return {
     wallet: wallet._id,
-    token: token._id,
+    tokenA: token._id,
     amount: amount.toString(),
     transactionHash: receipt.hash,
     status: receipt.status === 1 ? 'success' : 'failed',
@@ -118,49 +119,95 @@ async function returnAllFundsToMaster(distReturnConfig) {
       const childDerived = await getDerivedWallet(walletDoc);
       const childWallet = childDerived.connect(provider);
 
-      // 5b) Token doc (from usage)
-      const tokenDoc = await CryptoToken.findOne({
-        tokenAddress: usage.tokenAddress,
+      // 5b) Token A doc (from usage)
+      const tokenADoc = await CryptoToken.findOne({
+        tokenAddress: distReturnConfig.tokenA.tokenAddress,
         chainId: distReturnConfig.chainId,
       });
-      if (!tokenDoc) {
-        console.log(`No matching tokenDoc for usage tokenAddress=${usage.tokenAddress}, skipping...`);
-        continue;
+      if (tokenADoc) {
+        /********** (1) Transfer token A back **********/
+        const erc20TokenA = new ethers.Contract(tokenADoc.tokenAddress, MyTokenABI, childWallet);
+        const tokenBalTokenA = await erc20TokenA.balanceOf(childWallet.address);
+
+        let tokenReceiptTokenA;
+        if (tokenBalTokenA > 0n) {
+          const leftoverTokenBN = ethers.parseUnits(maxTokenLeftOver.toString(), tokenADoc.decimals);
+          if (tokenBalTokenA > leftoverTokenBN) {
+            const sendAmount = tokenBalTokenA - leftoverTokenBN;
+            console.log(`Sending ${ethers.formatUnits(sendAmount, tokenADoc.decimals)} token back to master...`);
+
+            const tokenATxParams = {
+              to: tokenADoc.tokenAddress,
+              data: erc20TokenA.interface.encodeFunctionData('transfer', [masterAddress, sendAmount]),
+              chainId: chainId,
+              nonce: await provider.getTransactionCount(childWallet.address, 'pending'),
+            };
+            tokenATxParams.gasLimit = await estimateGasOrFallback(provider, tokenATxParams, FALLBACK_ERC20_GAS);
+
+            const tokenATx = await childWallet.sendTransaction(tokenATxParams);
+            tokenReceiptTokenA = await tokenATx.wait();
+            if (tokenReceiptTokenA.status !== 1) {
+              throw new Error('Token return on-chain revert.');
+            }
+
+            if (tokenReceiptTokenA) {
+              await Transaction.create(
+                createTransactionRecord(walletDoc, tokenADoc, tokenReceiptTokenA, tokenBalTokenA, true)
+              );
+
+              await Balance.updateOne({ wallet: walletDoc._id }, { $set: { balance: '0' } });
+            }
+            console.log(`Token return success. TxHash: ${tokenReceiptTokenA.hash}`);
+          } else {
+            console.log('Token balance <= maxTokenLeftOver. Skipping token return...');
+          }
+        }
       }
 
-      /********** (1) Transfer token back **********/
-      const erc20 = new ethers.Contract(tokenDoc.tokenAddress, MyTokenABI, childWallet);
-      const tokenBal = await erc20.balanceOf(childWallet.address);
+      // 5c) Token B doc (from usage)
+      const tokenBDoc = await CryptoToken.findOne({
+        tokenAddress: distReturnConfig.tokenA,
+        chainId: distReturnConfig.chainId,
+      });
+      if (tokenBDoc) {
+        console.log(`No matching tokenBDoc for usage tokenAddress=${usage.tokenAddress}, skipping...`);
 
-      let tokenReceipt;
-      if (tokenBal > 0n) {
-        const leftoverTokenBN = ethers.parseUnits(maxTokenLeftOver.toString(), tokenDoc.decimals);
-        if (tokenBal > leftoverTokenBN) {
-          const sendAmount = tokenBal - leftoverTokenBN;
-          console.log(`Sending ${ethers.formatUnits(sendAmount, tokenDoc.decimals)} token back to master...`);
+        /********** (1) Transfer token B back **********/
+        const erc20TokenB = new ethers.Contract(tokenBDoc.tokenAddress, MyTokenABI, childWallet);
+        const tokenBalTokenB = await erc20TokenB.balanceOf(childWallet.address);
 
-          const tokenTxParams = {
-            to: tokenDoc.tokenAddress,
-            data: erc20.interface.encodeFunctionData('transfer', [masterAddress, sendAmount]),
-            chainId: chainId,
-            nonce: await provider.getTransactionCount(childWallet.address, 'pending'),
-          };
-          tokenTxParams.gasLimit = await estimateGasOrFallback(provider, tokenTxParams, FALLBACK_ERC20_GAS);
+        let tokenReceiptTokenB;
+        if (tokenBalTokenB > 0n) {
+          const leftoverTokenBN = ethers.parseUnits(maxTokenLeftOver.toString(), tokenBDoc.decimals);
+          if (tokenBalTokenB > leftoverTokenBN) {
+            const sendAmount = tokenBalTokenB - leftoverTokenBN;
+            console.log(`Sending ${ethers.formatUnits(sendAmount, tokenBDoc.decimals)} token back to master...`);
 
-          const tokenTx = await childWallet.sendTransaction(tokenTxParams);
-          tokenReceipt = await tokenTx.wait();
-          if (tokenReceipt.status !== 1) {
-            throw new Error('Token return on-chain revert.');
+            const tokenBTxParams = {
+              to: tokenBDoc.tokenAddress,
+              data: erc20TokenB.interface.encodeFunctionData('transfer', [masterAddress, sendAmount]),
+              chainId: chainId,
+              nonce: await provider.getTransactionCount(childWallet.address, 'pending'),
+            };
+            tokenBTxParams.gasLimit = await estimateGasOrFallback(provider, tokenBTxParams, FALLBACK_ERC20_GAS);
+
+            const tokenBTx = await childWallet.sendTransaction(tokenBTxParams);
+            tokenReceiptTokenB = await tokenBTx.wait();
+            if (tokenReceiptTokenB.status !== 1) {
+              throw new Error('Token return on-chain revert.');
+            }
+
+            if (tokenReceiptTokenB) {
+              await Transaction.create(
+                createTransactionRecord(walletDoc, tokenBDoc, tokenReceiptTokenB, tokenBalTokenB, true)
+              );
+
+              await Balance.updateOne({ wallet: walletDoc._id }, { $set: { balance: '0' } });
+            }
+            console.log(`Token return success. TxHash: ${tokenReceiptTokenB.hash}`);
+          } else {
+            console.log('Token balance <= maxTokenLeftOver. Skipping token return...');
           }
-
-          if (tokenReceipt) {
-            await Transaction.create(createTransactionRecord(walletDoc, tokenDoc, tokenReceipt, tokenBal, true));
-
-            await Balance.updateOne({ wallet: walletDoc._id }, { $set: { balance: '0' } });
-          }
-          console.log(`Token return success. TxHash: ${tokenReceipt.hash}`);
-        } else {
-          console.log('Token balance <= maxTokenLeftOver. Skipping token return...');
         }
       }
 
@@ -181,17 +228,32 @@ async function returnAllFundsToMaster(distReturnConfig) {
           };
           nativeTxParams.gasLimit = await estimateGasOrFallback(provider, nativeTxParams, FALLBACK_ETH_GAS);
 
-          const nativeTx = await childWallet.sendTransaction(nativeTxParams);
-          nativeReceipt = await nativeTx.wait();
-          if (nativeReceipt.status !== 1) {
-            throw new Error('Native return on-chain revert.');
+          // NEW: Check if the reserved leftover covers the estimated gas fee
+          const feeData = await provider.getFeeData();
+          const gasPrice = feeData.gasPrice || feeData.maxFeePerGas;
+          const estimatedFee = nativeTxParams.gasLimit * gasPrice;
+          if (leftoverEthBN < estimatedFee) {
+            console.log(
+              `Skipping native return for ${
+                childWallet.address
+              } due to low reserved balance for gas fee (required: ${ethers.formatEther(
+                estimatedFee
+              )}, reserved: ${ethers.formatEther(leftoverEthBN)}).`
+            );
+          } else {
+            const nativeTx = await childWallet.sendTransaction(nativeTxParams);
+            nativeReceipt = await nativeTx.wait();
+            currentNonce += 1n;
+            if (nativeReceipt.status !== 1) {
+              throw new Error('Native return on-chain revert.');
+            }
+            if (nativeReceipt) {
+              const nativeTokenDoc = await CryptoToken.findOne({ chainId, isNative: true });
+              await Transaction.create(createTransactionRecord(walletDoc, nativeTokenDoc, nativeReceipt, nativeBal, false));
+              await Balance.updateOne({ wallet: walletDoc._id }, { $set: { balance: '0' } });
+            }
+            console.log(`Native return success. TxHash: ${nativeReceipt.hash}`);
           }
-          if (nativeReceipt) {
-            const nativeTokenDoc = await CryptoToken.findOne({ chainId, isNative: true });
-            await Transaction.create(createTransactionRecord(walletDoc, nativeTokenDoc, nativeReceipt, nativeBal, false));
-            await Balance.updateOne({ wallet: walletDoc._id }, { $set: { balance: '0' } });
-          }
-          console.log(`Native return success. TxHash: ${nativeReceipt.hash}`);
         } else {
           console.log('Native balance <= maxNativeLeftOver. Skipping native return...');
         }

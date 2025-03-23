@@ -33,14 +33,14 @@ async function runSchedulerTask(schedulerName) {
       message = `Generated a total of ${affectedRows} addresses across ${walletGenConfigs.length} config(s).`;
     } else if (schedulerName === SchedulerTypes.TOKEN_DISTRIBUTION) {
       const DistReturnConfig = require('../models/distReturnConfig.model');
-      const distConfigs = await DistReturnConfig.find({ distributionEnabled: true }).populate('token');
+      const distConfigs = await DistReturnConfig.find({ distributionEnabled: true }).populate('tokenA').populate('tokenB');
 
       for (const config of distConfigs) {
         const count = await distributeToActiveWallets(config);
         affectedRows += count || 0;
       }
 
-      const returnConfigs = await DistReturnConfig.find({ returnEnabled: true }).populate('token');
+      const returnConfigs = await DistReturnConfig.find({ returnEnabled: true }).populate('tokenA').populate('tokenB');
 
       for (const config of returnConfigs) {
         const count = await returnAllFundsToMaster(config);

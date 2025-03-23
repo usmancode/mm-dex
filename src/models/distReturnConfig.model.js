@@ -53,11 +53,18 @@ const distReturnConfigSchema = mongoose.Schema(
       required: true,
       description: 'Distribution configuration expiration date and time',
     },
-    token: {
+    tokenA: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'CryptoToken',
       required: true,
-      description: 'Reference to the token configuration',
+      description: 'Reference to the Token A configuration',
+    },
+    tokenB: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CryptoToken',
+      required: false,
+      default: null,
+      description: 'Reference to the Token B configuration (optional)',
     },
     network: {
       type: String,
@@ -102,7 +109,8 @@ const distReturnConfigSchema = mongoose.Schema(
 distReturnConfigSchema.index({ network: 1, chainId: 1 });
 distReturnConfigSchema.index({ enabled: 1 });
 distReturnConfigSchema.index({ expireAt: 1 });
-distReturnConfigSchema.index({ token: 1 });
+distReturnConfigSchema.index({ tokenA: 1 });
+distReturnConfigSchema.index({ tokenA: 1, tokenB: 1 });
 
 distReturnConfigSchema.plugin(toJSON);
 distReturnConfigSchema.plugin(paginate);
