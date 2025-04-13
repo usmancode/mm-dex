@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { toJSON, paginate } = require('./plugins');
-
+const WalletTypes = require('../enums/walletTypes');
 const walletSchema = mongoose.Schema(
   {
     address: {
@@ -25,9 +25,11 @@ const walletSchema = mongoose.Schema(
       type: Number,
       default: 0,
     },
-    is_master: {
-      type: Boolean,
-      default: false,
+    type: {
+      type: String,
+      enum: Object.values(WalletTypes),
+      default: WalletTypes.NORMAL,
+      description: 'Type of wallet (e.g., normal, master)',
     },
     walletGenerationConfig: {
       type: mongoose.Schema.Types.ObjectId,
@@ -60,7 +62,7 @@ walletSchema.index({ hd_index: 1 });
 walletSchema.index({ status: 1, aggregateBuyWeight: -1, aggregateSellWeight: -1, aggregateVolume: -1 });
 
 // Index to quickly retrieve master wallets
-walletSchema.index({ is_master: 1 });
+walletSchema.index({ type: 1 });
 
 // If you often query by walletGenerationConfig, index that as well
 walletSchema.index({ walletGenerationConfig: 1 });

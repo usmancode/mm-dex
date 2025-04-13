@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
-const config = require('../src/config/config'); // Adjust path as needed
+const config = require('../src/config/config');
 const CryptoToken = require('../src/models/cryptoToken.model');
 const DistReturnConfig = require('../src/models/distReturnConfig.model');
 const WalletGenerationConfig = require('../src/models/walletGenerationConfig.model');
 const SchedulerConfig = require('../src/models/schedulerConfig.model');
-const SchedulerTypes = require('../src/config/schedulerTypes');
+const SchedulerTypes = require('../src/enums/schedulerTypes');
 
 async function seedDefaultEntries() {
   try {

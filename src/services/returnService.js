@@ -7,7 +7,8 @@ const WalletUsage = require('../models/walletUsage.model');
 const Transaction = require('../models/transaction.model');
 const Balance = require('../models/balance.model');
 const CryptoToken = require('../models/cryptoToken.model');
-const MyTokenABI = require('../config/abis/MyToken.json');
+const MyTokenABI = require('../config/abis/TrumpToken.json');
+const WalletTypes = require('../enums/walletTypes');
 
 // Gas config
 const GAS_BUFFER_PERCENTAGE = 20n;
@@ -105,7 +106,7 @@ async function returnAllFundsToMaster(distReturnConfig) {
   let totalReturned = 0;
   for (const usage of usageRecords) {
     const walletDoc = usage.wallet;
-    if (!walletDoc || walletDoc.is_master) {
+    if (!walletDoc || walletDoc.type === WalletTypes.MASTER) {
       continue;
     }
     if (walletDoc.status !== 'active') {

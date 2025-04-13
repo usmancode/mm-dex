@@ -1,7 +1,6 @@
-const { add } = require('winston');
 const Wallet = require('../models/wallet.model');
 const WalletUsage = require('../models/walletUsage.model');
-const { query } = require('express');
+const WalletTypes = require('../enums/walletTypes');
 
 /**
  * Activate a certain number of wallets for trading.
@@ -29,7 +28,10 @@ async function activateWalletsForTrading(limit, chainId, tokenAddress, pairAddre
   const needed = limit - existingCount;
 
   // Random sample of needed inactive wallets
-  let walletAgg = Wallet.aggregate([{ $match: { is_master: false, status: 'inactive' } }, { $sample: { size: needed } }]);
+  let walletAgg = Wallet.aggregate([
+    { $match: { type: WalletTypes.NORMAL, status: 'inactive' } },
+    { $sample: { size: needed } },
+  ]);
   if (session) walletAgg = walletAgg.session(session); // CHANGED
 
   const walletsToActivate = await walletAgg;
@@ -108,7 +110,7 @@ async function pickActivePool(options) {
   const lastTradeThreshold = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const query = {
-    is_master: false,
+    type: WalletTypes.NORMAL,
     chainId: chainId,
     tokenAddress: tokenAddress,
     $or: [{ lastTradeTime: { $lt: lastTradeThreshold } }, { lastTradeTime: null }],
@@ -150,7 +152,7 @@ async function pickWalletsForTrading(options) {
  * @returns {Promise<void>}
  */
 async function deactivateActiveWallets() {
-  const result = await Wallet.updateMany({ is_master: false, status: 'active' }, { status: 'inactive' });
+  const result = await Wallet.updateMany({ type: WalletTypes.NORMAL, status: 'active' }, { status: 'inactive' });
   console.log(`Deactivated ${result.modifiedCount} active wallets.`);
 }
 

@@ -3,7 +3,7 @@ const SchedulerLog = require('../models/schedulerLog.model');
 const { generateWalletsForConfig } = require('./walletGenerationService');
 const { distributeToActiveWallets } = require('./distributionService');
 const { returnAllFundsToMaster } = require('./returnService');
-const SchedulerTypes = require('../config/schedulerTypes');
+const SchedulerTypes = require('../enums/schedulerTypes');
 
 async function runSchedulerTask(schedulerName) {
   // Find the scheduler configuration by name

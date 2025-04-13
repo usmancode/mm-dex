@@ -3,6 +3,7 @@ const Wallet = require('../models/wallet.model');
 const { HDNodeWallet } = require('ethers');
 const { KMSClient, DecryptCommand } = require('@aws-sdk/client-kms');
 const config = require('../config/config');
+const WalletTypes = require('../enums/walletTypes');
 
 const kms = new KMSClient({
   region: config.aws.region,
@@ -95,7 +96,7 @@ const generateAddresses = async (walletGenConfig) => {
           {
             address,
             hd_index: newHdIndex,
-            is_master: newHdIndex == 0 ? true : false,
+            type: newHdIndex == 0 ? WalletTypes.MASTER : false,
             walletGenerationConfig: walletGenConfig._id,
             snapshot: {
               derivation_path: derivationPath,

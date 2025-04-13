@@ -21,7 +21,7 @@ const balanceSchema = mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: {},
       description:
-        'Embedded snapshot of related data: { wallet: { address, hd_index, is_master }, walletGenerationConfig: { network, derivation_path, seedVersions }, cryptoToken: { token_symbol, token_address, chainId, isNative, decimals } }',
+        'Embedded snapshot of related data: { wallet: { address, hd_index, type }, walletGenerationConfig: { network, derivation_path, seedVersions }, cryptoToken: { token_symbol, token_address, chainId, isNative, decimals } }',
     },
   },
   {

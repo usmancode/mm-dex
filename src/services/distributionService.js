@@ -7,7 +7,8 @@ const WalletUsage = require('../models/walletUsage.model');
 const Transaction = require('../models/transaction.model');
 const Balance = require('../models/balance.model');
 const CryptoToken = require('../models/cryptoToken.model');
-const MyTokenABI = require('../config/abis/MyToken.json');
+const MyTokenABI = require('../config/abis/TrumpToken.json');
+const WalletTypes = require('../enums/walletTypes');
 
 // Gas configuration
 const GAS_BUFFER_PERCENTAGE = 20n;
@@ -81,43 +82,40 @@ function applyGasBuffer(estimatedGas, fallback) {
  */
 function generateRandomAllocations(totalAmount, minAmount, maxAmount, count) {
   const MAX_TRIES = 100;
+  const DECIMAL_PLACES = 8; // Adjust based on your token's decimals
 
   for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
     let allocations = [];
     let remaining = Number(totalAmount);
 
     for (let i = 0; i < count; i++) {
+      remaining = parseFloat(remaining.toFixed(DECIMAL_PLACES)); // Key fix: round remaining
       if (i === count - 1) {
-        // Last wallet gets leftover
         if (remaining < minAmount || remaining > maxAmount) {
-          // This attempt fails; break out & try again
           allocations = null;
           break;
         }
-        allocations.push(parseFloat(remaining.toFixed(8)));
+        allocations.push(parseFloat(remaining.toFixed(DECIMAL_PLACES)));
       } else {
         const addressesLeft = count - i - 1;
-        const maxPossible = Math.min(maxAmount, remaining - minAmount * addressesLeft);
+        const maxPossible = Math.min(
+          maxAmount,
+          parseFloat((remaining - minAmount * addressesLeft).toFixed(DECIMAL_PLACES)) // Ensure precision
+        );
         if (maxPossible < minAmount) {
-          // This attempt fails; break out
           allocations = null;
           break;
         }
         let randomAlloc = Math.random() * (maxPossible - minAmount) + minAmount;
-        randomAlloc = parseFloat(randomAlloc.toFixed(8));
+        randomAlloc = parseFloat(randomAlloc.toFixed(DECIMAL_PLACES));
         allocations.push(randomAlloc);
-        remaining -= randomAlloc;
+        remaining = parseFloat((remaining - randomAlloc).toFixed(DECIMAL_PLACES)); // Key fix: round after subtraction
       }
     }
-
     if (allocations && allocations.length === count) {
-      // We succeeded in building a valid distribution; return it
       return allocations;
     }
-    // Otherwise, loop again and try another attempt
   }
-
-  // If we reach here, no valid distribution was found within MAX_TRIES
   throw new Error('Cannot generate a valid distribution after multiple attempts.');
 }
 
@@ -189,14 +187,13 @@ async function distributeToActiveWallets(distConfig) {
     // 4) Randomly pick the needed number of inactive wallets
     console.log(`Requested wallets: ${activePoolSize}`);
     const targetWallets = await Wallet.aggregate([
-      { $match: { is_master: false, status: 'inactive' } },
+      { $match: { type: WalletTypes.NORMAL, status: 'inactive' } },
       { $sample: { size: activePoolSize } },
     ]);
     if (!targetWallets.length) {
       console.log('No inactive wallets found. Stopping.');
       return 0;
     }
-
     // 5) Generate random allocations that sum exactly to the total amounts
     console.log(
       'totalNative, minNative, maxNative, targetWallets.length',
@@ -220,7 +217,7 @@ async function distributeToActiveWallets(distConfig) {
     const masterWallet = await getMasterWallet(provider, distConfig.masterWallet);
 
     // Keep the existing BATCH_SIZE logic for your flow
-    const BATCH_SIZE = 3;
+    const BATCH_SIZE = 20;
     const batches = [];
     for (let i = 0; i < targetWallets.length; i += BATCH_SIZE) {
       batches.push(targetWallets.slice(i, i + BATCH_SIZE));
@@ -229,6 +226,7 @@ async function distributeToActiveWallets(distConfig) {
     let totalDistributed = 0;
     for (let bIndex = 0; bIndex < batches.length; bIndex++) {
       const batch = batches[bIndex];
+      console.log('batch', batch);
       console.log(`Processing batch ${bIndex + 1} of ${batches.length}...`);
 
       // Fresh fee data for each batch
@@ -248,26 +246,47 @@ async function distributeToActiveWallets(distConfig) {
         console.log(`Attempting on-chain distribution for wallet ${wallet.address}...`);
 
         try {
-          // ---------- (A) Native Transfer ----------
-          // Convert allocation to a fixed decimal string to avoid scientific notation
+          // Assume the following constants are defined:
+          // GAS_BUFFER_PERCENTAGE, MAX_PRIORITY_FEE_GWEI, FEE_MULTIPLIER,
+          // FALLBACK_ETH_GAS = 21000n, etc.
+
+          // (A) Native Transfer
           const nativeAllocStr = nativeAllocations[totalDistributed].toFixed(8);
           const nativeAmount = ethers.parseEther(nativeAllocStr);
+
+          const feeData = await provider.getFeeData();
+          const computedPriorityFee =
+            feeData.maxPriorityFeePerGas &&
+            feeData.maxPriorityFeePerGas < ethers.parseUnits(MAX_PRIORITY_FEE_GWEI.toString(), 'gwei')
+              ? feeData.maxPriorityFeePerGas
+              : ethers.parseUnits(MAX_PRIORITY_FEE_GWEI.toString(), 'gwei');
+
+          const computedMaxFee = feeData.maxFeePerGas
+            ? (feeData.maxFeePerGas * BigInt(FEE_MULTIPLIER)) / 10n
+            : feeData.maxFeePerGas;
 
           const nativeTxParams = {
             to: wallet.address,
             value: nativeAmount,
             nonce: currentNonce,
             chainId: networkInfo.chainId,
-            maxPriorityFeePerGas,
-            maxFeePerGas,
+            maxPriorityFeePerGas: computedPriorityFee,
+            maxFeePerGas: computedMaxFee,
           };
 
-          try {
-            const est = await provider.estimateGas(nativeTxParams);
-            nativeTxParams.gasLimit = applyGasBuffer(est, FALLBACK_ETH_GAS);
-          } catch (err) {
-            console.error('Native gas estimation failed:', err.message);
+          // Check if the destination is an externally owned account (EOA)
+          const recipientCode = await provider.getCode(wallet.address);
+          if (recipientCode === '0x') {
+            // EOA: gas usage is standard, so avoid estimation overhead
             nativeTxParams.gasLimit = FALLBACK_ETH_GAS;
+          } else {
+            try {
+              const est = await provider.estimateGas(nativeTxParams);
+              nativeTxParams.gasLimit = applyGasBuffer(est, FALLBACK_ETH_GAS);
+            } catch (err) {
+              console.error('Native gas estimation failed:', err.message);
+              nativeTxParams.gasLimit = FALLBACK_ETH_GAS;
+            }
           }
 
           const nativeTx = await masterWallet.sendTransaction(nativeTxParams);
@@ -280,20 +299,26 @@ async function distributeToActiveWallets(distConfig) {
           }
 
           // ---------- (B) ERC20 Token Transfer ----------
+
+          // Create the ERC20 token contract instance using your ABI and wallet
           const erc20Contract = new ethers.Contract(tokenDoc.tokenAddress, MyTokenABI, masterWallet);
+
+          // Convert the allocation to the correct unit based on token decimals
           const tokenAllocVal = tokenAllocations[totalDistributed];
           const tokenAmount = ethers.parseUnits(tokenAllocVal.toString(), tokenDoc.decimals);
 
+          // Build the transaction parameters for the token transfer
           const tokenTxParams = {
             to: tokenDoc.tokenAddress,
             data: erc20Contract.interface.encodeFunctionData('transfer', [wallet.address, tokenAmount]),
             nonce: currentNonce,
             chainId: networkInfo.chainId,
-            maxPriorityFeePerGas,
-            maxFeePerGas,
+            maxPriorityFeePerGas: computedPriorityFee,
+            maxFeePerGas: computedMaxFee,
           };
 
           try {
+            // Estimate gas usage; if successful, apply a buffer using your fallback value as the lower bound.
             const est = await provider.estimateGas(tokenTxParams);
             tokenTxParams.gasLimit = applyGasBuffer(est, FALLBACK_ERC20_GAS);
           } catch (err) {
@@ -301,11 +326,15 @@ async function distributeToActiveWallets(distConfig) {
             tokenTxParams.gasLimit = FALLBACK_ERC20_GAS;
           }
 
+          // Send the ERC20 token transfer transaction
           const tokenTx = await masterWallet.sendTransaction(tokenTxParams);
           console.log(`Sent ${tokenAllocVal} ${tokenDoc.tokenSymbol} to ${wallet.address}`);
+
+          // Wait for the transaction to be mined and update the nonce
           const tokenReceipt = await tokenTx.wait();
           currentNonce += 1n;
 
+          // Check that the transaction succeeded on-chain
           if (tokenReceipt.status !== 1) {
             throw new Error(`ERC20 transfer to ${wallet.address} reverted on-chain`);
           }
