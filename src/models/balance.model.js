@@ -11,7 +11,11 @@ const balanceSchema = mongoose.Schema(
     token: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'CryptoToken',
-      required: true,
+      required: false,
+    },
+    isNative: {
+      type: Boolean,
+      default: false,
     },
     balance: {
       type: mongoose.Schema.Types.Decimal128,

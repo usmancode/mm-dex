@@ -28,7 +28,7 @@ async function startWorker() {
       },
       {
         connection,
-        concurrency: 3,
+        concurrency: 1,
       }
     );
 

@@ -96,7 +96,7 @@ const generateAddresses = async (walletGenConfig) => {
           {
             address,
             hd_index: newHdIndex,
-            type: newHdIndex == 0 ? WalletTypes.MASTER : false,
+            type: newHdIndex == 0 ? WalletTypes.MASTER : WalletTypes.NORMAL,
             walletGenerationConfig: walletGenConfig._id,
             snapshot: {
               derivation_path: derivationPath,
@@ -108,38 +108,6 @@ const generateAddresses = async (walletGenConfig) => {
       );
       //const walletDoc = walletDocs[0];
       generatedCount++;
-
-      // if (nativeToken) {
-      //   await Balance.create(
-      //     [
-      //       {
-      //         wallet: walletDoc._id,
-      //         token: nativeToken._id,
-      //         balance: 0,
-      //         snapshot: {
-      //           wallet: {
-      //             address: walletDoc.address,
-      //             hd_index: walletDoc.hd_index,
-      //             is_master: walletDoc.is_master,
-      //           },
-      //           walletGenerationConfig: {
-      //             derivation_path: derivationPath,
-      //             seedVersion: walletGenConfig.seedVersion
-      //           },
-      //           cryptoToken: {
-      //             tokenSymbol: nativeToken.tokenSymbol,
-      //             tokenAddress: nativeToken.tokenAddress,
-      //             chainId: nativeToken.chainId,
-      //             isNative: nativeToken.isNative,
-      //             decimals: nativeToken.decimals,
-      //           },
-      //         },
-      //       },
-      //     ],
-      //     { session }
-      //   );
-
-      // }
     }
 
     await session.commitTransaction();

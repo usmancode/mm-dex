@@ -79,6 +79,7 @@ module.exports = {
   },
   rpc: {
     quicknode: envVars.QUICKNODE_RPC,
+    uniswap: envVars.QUICKNODE_RPC,
   },
   uniswap: {
     routerAddress: envVars.UNISWAP_ROUTER_ADDRESS,
@@ -90,6 +91,7 @@ module.exports = {
     poolAddress: envVars.UNISWAP_POOL_ADDRESS,
     FEE_TIER: 3000, // 0.3% fee tier
     slippageTolerance: 1.5, // 1.5% slippage
+    minNativeForGas: 7000000000000n, // Minimum native token balance for gas fees
   },
   quickswap: {
     routerAddress: envVars.QUICKSWAP_ROUTER_ADDRESS,
