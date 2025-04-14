@@ -99,7 +99,7 @@ module.exports = {
     WPOL: envVars.QUICKSWAP_WPOL,
     factoryAddress: envVars.QUICKSWAP_FACTORY_ADDRESS,
     factoryABI: require('../config/abis/QuickswapFactory.json'),
-    poolABI: require('../config/abis/QuickswapPool.json'),
+    poolABI: require('../config/abis/quickswapPool.json'),
     poolAddress: envVars.QUICKSWAP_POOL_ADDRESS,
     FEE_TIER: 100, // 0.1% fee tier
     slippageTolerance: 1.5, // 1.5% slippage

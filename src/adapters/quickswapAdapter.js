@@ -1,7 +1,7 @@
 const { ethers } = require('ethers');
 const FACTORY_ABI = require('../config/abis/QuickswapFactory.json');
 const SWAP_ROUTER_ABI = require('../config/abis/QuickswapRouter.json');
-const POOL_ABI = require('../config/abis/QuickswapPool.json');
+const POOL_ABI = require('../config/abis/quickswapPool.json');
 const ERC20_ABI = require('../config/abis/TrumpToken.json');
 const config = require('../config/config');
 const { getUniswapV3PoolBalances } = require('../utils/priceFetcher');
