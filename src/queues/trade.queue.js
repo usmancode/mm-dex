@@ -1,4 +1,3 @@
-// src/queues/trade.queue.js
 const { Queue } = require('bullmq');
 const IORedis = require('ioredis');
 

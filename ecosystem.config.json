@@ -1,14 +1,31 @@
 {
   "apps": [
     {
-      "name": "app",
-      "script": "src/index.js",
-      "instances": 1,
-      "autorestart": true,
-      "watch": false,
-      "time": true,
+      "name": "dev-server",
+      "script": "npm",
+      "args": "run dev",
       "env": {
-        "NODE_ENV": "production"
+        "NODE_ENV": "development",
+        "REDIS_HOST": "127.0.0.1",
+        "REDIS_PORT": 6379
+      },
+      "watch": true,
+      "ignore_watch": ["node_modules", "logs"]
+    },
+    {
+      "name": "trade-worker",
+      "script": "npm",
+      "args": "run trade",
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    {
+      "name": "queue-worker",
+      "script": "npm",
+      "args": "run queue",
+      "env": {
+        "NODE_ENV": "development"
       }
     }
   ]

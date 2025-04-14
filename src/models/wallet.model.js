@@ -55,7 +55,7 @@ const walletSchema = mongoose.Schema(
 );
 
 // Indexes
-walletSchema.index({ address: 1 }); // Unique address index
+walletSchema.index({ walletAddress: 1 }); // Unique address index
 walletSchema.index({ hd_index: 1 });
 
 // Compound index for queries filtering by status and sorting by aggregate metrics
