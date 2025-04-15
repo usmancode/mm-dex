@@ -51,6 +51,7 @@ module.exports = {
   mongoose: {
     url: envVars.MONGODB_URL + (envVars.NODE_ENV === 'test' ? '-test' : ''),
   },
+  apiKey: process.env.API_KEY || 'your-secure-api-key',
   jwt: {
     secret: envVars.JWT_SECRET,
     accessExpirationMinutes: envVars.JWT_ACCESS_EXPIRATION_MINUTES,

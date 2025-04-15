@@ -4,8 +4,10 @@ const userRoute = require('./user.route');
 const docsRoute = require('./docs.route');
 const tradeRoute = require('./trade.route'); // Import your trade route
 const config = require('../../config/config');
+const { apiKeyAuth } = require('../../middlewares/auth'); // Import apiKeyAuth
 
 const router = express.Router();
+router.use(apiKeyAuth);
 
 const defaultRoutes = [
   {
