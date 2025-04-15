@@ -1,4 +1,3 @@
-// transfer-service.js
 const { ethers } = require('ethers');
 const config = require('../config/config');
 const WalletUsage = require('../models/walletUsage.model');
@@ -15,6 +14,7 @@ class TransferService {
     }
     return new ethers.JsonRpcProvider(config.rpc[protocol]);
   }
+
   async createSigner(protocol, derivedWallet) {
     const provider = await this.createProvider(protocol);
     return new ethers.Wallet(derivedWallet.privateKey, provider);
@@ -26,7 +26,6 @@ class TransferService {
       console.log('No eligible wallets found');
       return null;
     }
-
     // Randomly select a wallet from the eligible list
     const randomIndex = Math.floor(Math.random() * eligibleWallets.length);
     const selectedWallet = eligibleWallets[randomIndex];
@@ -53,6 +52,7 @@ class TransferService {
         txnType: TxnTypes.REBALANCING,
         message: 'Transaction initiated',
       });
+
       const txResponse = await signer.sendTransaction(tx);
       await TransactionService.updateTransaction(transaction.id, {
         transactionHash: txResponse.hash,
@@ -125,10 +125,7 @@ class TransferService {
     let transaction;
     try {
       const signer = await this.createSigner(protocol, derivedWallet);
-      const tx = {
-        to: toAddress,
-        value: amount,
-      };
+      const tx = { to: toAddress, value: amount };
       console.log('Refilling Gas Transaction Before Executing Tx:', tx);
       transaction = await TransactionService.createTransaction({
         walletId: derivedWalletId,
@@ -173,6 +170,7 @@ class TransferService {
 
       const parsedAmount = ethers.parseUnits(amount.toString(), decimals);
       console.log('ERC20 Token Transfer Transaction:', { toAddress, parsedAmount });
+
       transaction = await TransactionService.createTransaction({
         walletId: derivedWalletId,
         amount: parsedAmount,
@@ -184,9 +182,7 @@ class TransferService {
         txnType: TxnTypes.REBALANCING,
         message: 'Transaction initiated',
       });
-      const txResponse = await contract.transfer(toAddress, parsedAmount, {
-        gasLimit: 100000,
-      });
+      const txResponse = await contract.transfer(toAddress, parsedAmount, { gasLimit: 100000 });
       await TransactionService.updateTransaction(transaction.id, {
         transactionHash: txResponse.hash,
         message: 'Transaction submitted to network',
@@ -230,41 +226,52 @@ class TransferService {
   ) {
     try {
       const signer = await this.createSigner(protocol, derivedWallet);
-      let wallet;
+      let withdrawalWallet;
+      // If tokenIn is NOT native, we transfer that token. If it is native, we look for the tokenOut-based wallet.
       if (!tokenInDoc.isNative) {
-        wallet = await this.getWithdrawalAddress(tokenInDoc.tokenAddress, protocol);
+        withdrawalWallet = await this.getWithdrawalAddress(tokenInDoc.tokenAddress, protocol);
       } else {
-        wallet = await this.getWithdrawalAddress(tokenOutDoc.tokenAddress, protocol);
+        withdrawalWallet = await this.getWithdrawalAddress(tokenOutDoc.tokenAddress, protocol);
       }
 
       if (tokenInDoc.isNative) {
-        await this.transferNativeToken(signer, wallet.address, amount, tokenInDoc.decimals, derivedWalletId);
+        // Transfer native tokens
+        await this.transferNativeToken(signer, withdrawalWallet.address, amount, tokenInDoc.decimals, derivedWalletId);
         await balanceModel.updateOne(
-          { address: wallet.address, tokenAddress: tokenInDoc.tokenAddress },
+          { address: withdrawalWallet.address, tokenAddress: tokenInDoc.tokenAddress },
           { $inc: { balance: amount.toString() } }
         );
-        console.log(`Native token transfer successful to ${withdrawalAddress}`);
-        return wallet;
+        console.log(`Native token transfer successful to ${withdrawalWallet.address}`);
+        return withdrawalWallet;
       }
+
+      // Transfer ERC20
       await this.transferERC20Token(
         signer,
         tokenInDoc.tokenAddress,
-        wallet.address,
+        withdrawalWallet.address,
         amount,
         tokenInDoc.decimals,
         derivedWalletId
       );
       await balanceModel.updateOne(
-        { address: wallet.address, tokenAddress: tokenInDoc.tokenAddress },
+        { address: withdrawalWallet.address, tokenAddress: tokenInDoc.tokenAddress },
         { $inc: { balance: amount.toString() } }
       );
-      console.log(`ERC20 token transfer successful to ${wallet.address}`);
-      if (!(await this.checkNativeBalanceForGas(wallet, protocol))) {
-        console.log(`Refilling gas for ${wallet.address}`, config[protocol].minNativeForGas);
+      console.log(`ERC20 token transfer successful to ${withdrawalWallet.address}`);
+
+      // Ensure the receiving wallet has enough gas
+      if (!(await this.checkNativeBalanceForGas(withdrawalWallet, protocol))) {
+        console.log(`Refilling gas for ${withdrawalWallet.address}`, config[protocol].minNativeForGas);
         const gasStationSigner = await this.createSigner(protocol, gasStation);
-        await this.refillGas(gasStationSigner, wallet.address, gasStationWalletId, config[protocol].minNativeForGas);
+        await this.refillGas(
+          gasStationSigner,
+          withdrawalWallet.address,
+          gasStationWalletId,
+          config[protocol].minNativeForGas
+        );
       }
-      return wallet;
+      return withdrawalWallet;
     } catch (error) {
       console.error(`Transfer failed on ${protocol}:`, error);
       throw error;

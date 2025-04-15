@@ -6,13 +6,10 @@ const config = require('../config/config');
 const { getUniswapV3PoolBalances } = require('../utils/priceFetcher');
 const TransactionService = require('../services/transaction.service');
 const TxnStatus = require('../enums/txnStatus');
-const Wallet = require('../models/wallet.model');
 const TxnTypes = require('../enums/txnTypes');
-const BalanceService = require('../services/balance.service');
-const WalletTypes = require('../enums/walletTypes');
-const { getHDWallet } = require('../services/walletService');
-const WalletGenerationConfig = require('../models/walletGenerationConfig.model');
 const TransferService = require('../services/transferService');
+const { getWalletIdByAddress, getGasStationWallet, getDerivedWallet } = require('../services/walletService');
+const BalanceService = require('../services/balance.service');
 
 async function approveToken(tokenAddress, tokenABI, amount, signerWallet, swapRouterAddress) {
   if (!amount || typeof amount === 'undefined') {
@@ -64,7 +61,7 @@ async function approveToken(tokenAddress, tokenABI, amount, signerWallet, swapRo
       amount: approve100TimesAmount.toString(),
       transactionHash: null,
       status: TxnStatus.PENDING,
-      params: gasParams,
+      params: { router: swapRouterAddress, amount: approve100TimesAmount.toString() },
       chainId: config.uniswap.chainId,
       dex: config.uniswap.name,
       txnType: TxnTypes.APPROVE,
@@ -95,6 +92,7 @@ async function approveToken(tokenAddress, tokenABI, amount, signerWallet, swapRo
     throw new Error(`Token approval failed: ${error.shortMessage}`);
   }
 }
+
 function toFixedString(value) {
   const valueStr = value.toString();
   if (!valueStr.includes('e-')) return valueStr;
@@ -118,8 +116,10 @@ async function calculateSwapAmounts(poolAddress, tokenIn, tokenOut, amountHuman,
   const decimalsIn = isToken0 ? token0Decimals : token1Decimals;
   const decimalsOut = isToken0 ? token1Decimals : token0Decimals;
   console.log('decimalsIn', decimalsIn);
+
   const amountWei = ethers.parseUnits(amountHuman.toString(), decimalsIn);
   console.log('amountWei', amountWei);
+
   const slippageMultiplier = 1000n - BigInt(Math.round(slippage * 10));
   const amountOutMin = await getUniswapV3PoolBalances(
     poolAddress,
@@ -132,12 +132,12 @@ async function calculateSwapAmounts(poolAddress, tokenIn, tokenOut, amountHuman,
   const parts = amountOutMinStr.split('.');
   let truncatedAmount = parts[0];
   if (parts.length > 1) {
-    // Truncate decimals to 18 places (match decimalsIn)
     truncatedAmount += '.' + parts[1].slice(0, 18);
   }
 
   let resultWei = ethers.parseUnits(truncatedAmount, decimalsIn);
   console.log('resultWei', resultWei);
+
   return {
     amountIn: amountWei,
     amountOutMin: (resultWei * slippageMultiplier) / 1000n,
@@ -163,6 +163,7 @@ exports.executeTrade = async (wallet, amountHuman, slippageTolerance, tokenIn, t
       provider
     );
 
+    // 1) Approve token if needed
     if (await approveToken(tokenIn.tokenAddress, ERC20_ABI, amountIn, signer, swapRouter.target)) {
       const params = {
         tokenIn: tokenIn.tokenAddress,
@@ -175,8 +176,10 @@ exports.executeTrade = async (wallet, amountHuman, slippageTolerance, tokenIn, t
       };
       const overrides = tokenIn.isNative ? { value: amountIn } : {};
       console.log('params', params);
-      const walletId = await getWalletIdByAddress(signer.address);
-      if ((await checkBalance(signer.address, config.uniswap.name, true)) < config[protocol].minNativeForGas) {
+
+      // 2) Ensure we have enough gas (native token) in the wallet
+      const currentGasBalance = await BalanceService.balanceOf(null, signer.address, config.uniswap.name, true);
+      if (currentGasBalance < config[protocol].minNativeForGas) {
         const gasStationWallet = await getGasStationWallet();
         const derivedGasStationWallet = await getDerivedWallet(gasStationWallet);
         await TransferService.refillGasForWallet(
@@ -188,6 +191,8 @@ exports.executeTrade = async (wallet, amountHuman, slippageTolerance, tokenIn, t
         );
       }
 
+      // 3) Create transaction record
+      const walletId = await getWalletIdByAddress(signer.address);
       transaction = await TransactionService.createTransaction({
         walletId: walletId,
         amount: amountIn,
@@ -199,6 +204,8 @@ exports.executeTrade = async (wallet, amountHuman, slippageTolerance, tokenIn, t
         txnType: TxnTypes.SWAP,
         message: 'Transaction initiated',
       });
+
+      // 4) Execute the swap
       const txResponse = await swapRouter.exactInputSingle(params, overrides);
       await TransactionService.updateTransaction(transaction.id, {
         transactionHash: txResponse.hash,
@@ -229,33 +236,7 @@ exports.executeTrade = async (wallet, amountHuman, slippageTolerance, tokenIn, t
         message: error.message || 'Transaction failed',
       });
     }
-
     console.error('Trade Execution Error:', error);
     return { status: 'failed', error: error.message };
   }
 };
-
-async function checkBalance(walletAddress, protocol, isNative) {
-  return await BalanceService.balanceOf(null, walletAddress, protocol, isNative);
-}
-
-async function getWalletIdByAddress(walletAddress) {
-  const wallet = await Wallet.findOne({ address: walletAddress });
-  if (!wallet) {
-    throw new Error('Wallet not found');
-  }
-  return wallet.id;
-}
-
-async function getGasStationWallet() {
-  const gasStationWallet = await Wallet.findOne({ status: 'active', type: WalletTypes.GAS_STATION }).lean();
-  if (!gasStationWallet) throw new Error('Gas station wallet not found');
-  return gasStationWallet;
-}
-
-async function getDerivedWallet(wallet) {
-  const genConfig = await WalletGenerationConfig.findById(wallet.walletGenerationConfig);
-  if (!genConfig) throw new Error('Wallet generation config not found: ' + wallet._id);
-  const hdWallet = await getHDWallet(genConfig.derivation_path);
-  return hdWallet.derivePath(`${wallet.hd_index}`);
-}
