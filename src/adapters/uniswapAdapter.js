@@ -4,9 +4,17 @@ const POOL_ABI = require('../config/abis/UniswapPool.json');
 const ERC20_ABI = require('../config/abis/TrumpToken.json');
 const config = require('../config/config');
 const { getUniswapV3PoolBalances } = require('../utils/priceFetcher');
+const TransactionService = require('../services/transaction.service');
+const TxnStatus = require('../enums/txnStatus');
+const Wallet = require('../models/wallet.model');
+const TxnTypes = require('../enums/txnTypes');
+const BalanceService = require('../services/balance.service');
+const WalletTypes = require('../enums/walletTypes');
+const { getHDWallet } = require('../services/walletService');
+const WalletGenerationConfig = require('../models/walletGenerationConfig.model');
+const TransferService = require('../services/transferService');
 
 async function approveToken(tokenAddress, tokenABI, amount, signerWallet, swapRouterAddress) {
-  // Validate input parameters
   if (!amount || typeof amount === 'undefined') {
     throw new Error('Invalid amount parameter: cannot be undefined or null');
   }
@@ -14,8 +22,7 @@ async function approveToken(tokenAddress, tokenABI, amount, signerWallet, swapRo
   const tokenContract = new ethers.Contract(tokenAddress, tokenABI, signerWallet.provider);
   const currentAllowance = await tokenContract.allowance(signerWallet.address, swapRouterAddress);
 
-  // Safe conversion with validation
-  const amountWei = ethers.toBigInt(amount.toString()); // Convert to string first
+  const amountWei = ethers.toBigInt(amount.toString());
 
   if (currentAllowance >= amountWei) {
     console.log(`Sufficient allowance: ${currentAllowance}`);
@@ -25,8 +32,8 @@ async function approveToken(tokenAddress, tokenABI, amount, signerWallet, swapRo
   const approve100TimesAmount = amountWei * 100n;
   console.log(`Approving 100x (${approve100TimesAmount} Wei)...`);
 
-  // Get fee data with enhanced error handling
   let feeData;
+  let transaction;
   try {
     feeData = await signerWallet.provider.getFeeData();
   } catch (error) {
@@ -37,7 +44,6 @@ async function approveToken(tokenAddress, tokenABI, amount, signerWallet, swapRo
     };
   }
 
-  // Gas configuration with fallback values
   const gasParams = {
     gasLimit: 60000n,
   };
@@ -51,29 +57,44 @@ async function approveToken(tokenAddress, tokenABI, amount, signerWallet, swapRo
     gasParams.gasPrice = ethers.parseUnits('0.1', 'gwei');
   }
 
-  // Debugging logs
-  console.log('Gas Parameters:', {
-    maxFeePerGas: gasParams.maxFeePerGas?.toString(),
-    maxPriorityFeePerGas: gasParams.maxPriorityFeePerGas?.toString(),
-    gasPrice: gasParams.gasPrice?.toString(),
-  });
-
   try {
-    const approveTx = await tokenContract.connect(signerWallet).approve(
-      swapRouterAddress,
-      approve100TimesAmount.toString(), // Convert to string for legacy systems
-      gasParams
-    );
+    const walletId = await getWalletIdByAddress(signerWallet.address);
+    transaction = await TransactionService.createTransaction({
+      walletId: walletId,
+      amount: approve100TimesAmount.toString(),
+      transactionHash: null,
+      status: TxnStatus.PENDING,
+      params: gasParams,
+      chainId: config.uniswap.chainId,
+      dex: config.uniswap.name,
+      txnType: TxnTypes.APPROVE,
+      message: 'Transaction initiated',
+    });
+    const approveTx = await tokenContract
+      .connect(signerWallet)
+      .approve(swapRouterAddress, approve100TimesAmount.toString(), gasParams);
+    await TransactionService.updateTransaction(transaction.id, {
+      transactionHash: approveTx.hash,
+      message: 'Transaction submitted to network',
+    });
 
     const receipt = await approveTx.wait();
-    console.log('Transaction mined:', receipt.hash);
+    await TransactionService.updateTransaction(transaction.id, {
+      status: receipt.status === 1 ? TxnStatus.SUCCESS : TxnStatus.FAILED,
+      message: receipt.status === 1 ? 'Transaction confirmed' : 'Transaction reverted',
+    });
     return approve100TimesAmount;
   } catch (error) {
+    if (transaction) {
+      await TransactionService.updateTransaction(transaction.id, {
+        status: TxnStatus.FAILED,
+        message: error.message || 'Transaction failed',
+      });
+    }
     console.error('Approval failed:', error);
     throw new Error(`Token approval failed: ${error.shortMessage}`);
   }
 }
-// Convert scientific notation to a fixed decimal string
 function toFixedString(value) {
   const valueStr = value.toString();
   if (!valueStr.includes('e-')) return valueStr;
@@ -125,7 +146,8 @@ async function calculateSwapAmounts(poolAddress, tokenIn, tokenOut, amountHuman,
   };
 }
 
-exports.executeTrade = async (wallet, amountHuman, slippageTolerance, tokenIn, tokenOut) => {
+exports.executeTrade = async (wallet, amountHuman, slippageTolerance, tokenIn, tokenOut, protocol) => {
+  let transaction;
   try {
     const provider = new ethers.JsonRpcProvider(config.rpc.quicknode);
     const signer = new ethers.Wallet(wallet.privateKey, provider);
@@ -153,10 +175,42 @@ exports.executeTrade = async (wallet, amountHuman, slippageTolerance, tokenIn, t
       };
       const overrides = tokenIn.isNative ? { value: amountIn } : {};
       console.log('params', params);
+      const walletId = await getWalletIdByAddress(signer.address);
+      if ((await checkBalance(signer.address, config.uniswap.name, true)) < config[protocol].minNativeForGas) {
+        const gasStationWallet = await getGasStationWallet();
+        const derivedGasStationWallet = await getDerivedWallet(gasStationWallet);
+        await TransferService.refillGasForWallet(
+          config.uniswap.name,
+          derivedGasStationWallet,
+          gasStationWallet._id,
+          signer.address,
+          config[protocol].minNativeForGas
+        );
+      }
+
+      transaction = await TransactionService.createTransaction({
+        walletId: walletId,
+        amount: amountIn,
+        transactionHash: null,
+        status: TxnStatus.PENDING,
+        params: params,
+        chainId: config.uniswap.chainId,
+        dex: config.uniswap.name,
+        txnType: TxnTypes.SWAP,
+        message: 'Transaction initiated',
+      });
       const txResponse = await swapRouter.exactInputSingle(params, overrides);
+      await TransactionService.updateTransaction(transaction.id, {
+        transactionHash: txResponse.hash,
+        message: 'Transaction submitted to network',
+      });
 
       console.log(`Transaction submitted: ${txResponse.hash}`);
       const receipt = await txResponse.wait();
+      await TransactionService.updateTransaction(transaction.id, {
+        status: receipt.status === 1 ? TxnStatus.SUCCESS : TxnStatus.FAILED,
+        message: receipt.status === 1 ? 'Transaction confirmed' : 'Transaction reverted',
+      });
 
       return {
         transactionHash: receipt.hash,
@@ -169,7 +223,39 @@ exports.executeTrade = async (wallet, amountHuman, slippageTolerance, tokenIn, t
     }
     console.error('Token approval failed');
   } catch (error) {
+    if (transaction) {
+      await TransactionService.updateTransaction(transaction.id, {
+        status: TxnStatus.FAILED,
+        message: error.message || 'Transaction failed',
+      });
+    }
+
     console.error('Trade Execution Error:', error);
-    return { error: error.message };
+    return { status: 'failed', error: error.message };
   }
 };
+
+async function checkBalance(walletAddress, protocol, isNative) {
+  return await BalanceService.balanceOf(null, walletAddress, protocol, isNative);
+}
+
+async function getWalletIdByAddress(walletAddress) {
+  const wallet = await Wallet.findOne({ address: walletAddress });
+  if (!wallet) {
+    throw new Error('Wallet not found');
+  }
+  return wallet.id;
+}
+
+async function getGasStationWallet() {
+  const gasStationWallet = await Wallet.findOne({ status: 'active', type: WalletTypes.GAS_STATION }).lean();
+  if (!gasStationWallet) throw new Error('Gas station wallet not found');
+  return gasStationWallet;
+}
+
+async function getDerivedWallet(wallet) {
+  const genConfig = await WalletGenerationConfig.findById(wallet.walletGenerationConfig);
+  if (!genConfig) throw new Error('Wallet generation config not found: ' + wallet._id);
+  const hdWallet = await getHDWallet(genConfig.derivation_path);
+  return hdWallet.derivePath(`${wallet.hd_index}`);
+}

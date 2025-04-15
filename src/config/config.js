@@ -93,6 +93,8 @@ module.exports = {
     FEE_TIER: 3000, // 0.3% fee tier
     slippageTolerance: 1.5, // 1.5% slippage
     minNativeForGas: 7000000000000n, // Minimum native token balance for gas fees
+    chainId: 8453, // Base chain ID for Uniswap
+    name: 'uniswap',
   },
   quickswap: {
     routerAddress: envVars.QUICKSWAP_ROUTER_ADDRESS,

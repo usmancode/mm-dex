@@ -1,29 +1,11 @@
 const express = require('express');
-const authRoute = require('./auth.route');
-const userRoute = require('./user.route');
 const docsRoute = require('./docs.route');
 const tradeRoute = require('./trade.route'); // Import your trade route
+const distReturnConfigRoute = require('./distReturnConfig.route'); // Import distReturnConfig route
 const config = require('../../config/config');
 const { apiKeyAuth } = require('../../middlewares/auth'); // Import apiKeyAuth
 
 const router = express.Router();
-router.use(apiKeyAuth);
-
-const defaultRoutes = [
-  {
-    path: '/auth',
-    route: authRoute,
-  },
-  {
-    path: '/users',
-    route: userRoute,
-  },
-  {
-    path: '/trade',
-    route: tradeRoute, // Mount the trade route at /trade
-  },
-];
-
 const devRoutes = [
   // routes available only in development mode
   {
@@ -31,16 +13,27 @@ const devRoutes = [
     route: docsRoute,
   },
 ];
-
-defaultRoutes.forEach((route) => {
-  router.use(route.path, route.route);
-});
-
 /* istanbul ignore next */
 if (config.env === 'development') {
   devRoutes.forEach((route) => {
     router.use(route.path, route.route);
   });
 }
+router.use(apiKeyAuth);
+
+const defaultRoutes = [
+  {
+    path: '/trade',
+    route: tradeRoute,
+  },
+  {
+    path: '/dist-return-configs',
+    route: distReturnConfigRoute,
+  },
+];
+
+defaultRoutes.forEach((route) => {
+  router.use(route.path, route.route);
+});
 
 module.exports = router;

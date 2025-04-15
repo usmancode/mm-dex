@@ -6,7 +6,7 @@ const { getHDWallet } = require('./walletService');
 const WalletGenerationConfig = require('../models/walletGenerationConfig.model');
 const config = require('../config/config');
 const balanceModel = require('../models/balance.model');
-const transferService = require('./transferService');
+const TransferService = require('./transferService');
 const WalletTypes = require('../enums/walletTypes');
 const Wallet = require('../models/wallet.model');
 const BalanceService = require('./balance.service');
@@ -47,7 +47,7 @@ exports.processTradeJob = async (job) => {
   //let walletRecord = await triggerEmergencyRebalance(protocol, tokenInDoc, tokenOutDoc, amount);
   if (!walletRecord) {
     // If no wallet qualifies, trigger emergency rebalance
-    // walletRecord = await triggerEmergencyRebalance(protocol, tokenInDoc, tokenOutDoc, amount);
+    walletRecord = await triggerEmergencyRebalance(protocol, tokenInDoc, tokenOutDoc, amount);
     if (!walletRecord) {
       throw new Error('No wallet available to execute trade, even after emergency rebalancing.');
     }
@@ -67,11 +67,12 @@ exports.processTradeJob = async (job) => {
     (await checkBalance(config.nativeTokenAddress, walletRecord.address, protocol, true)) < config[protocol].minNativeForGas
   ) {
     console.log(`Insufficient gas balance in ${protocol} ${walletRecord.address}. Attempting to refill...`);
-    const fundingWallet = await getFundingWallet();
-    const derivedWallet = await getDerivedWallet(fundingWallet);
-    await transferService.refillGasForWallet(
+    const gasStationWallet = await getGasStationWallet();
+    const derivedGasStationWallet = await getDerivedWallet(gasStationWallet);
+    await TransferService.refillGasForWallet(
       protocol,
-      derivedWallet,
+      derivedGasStationWallet,
+      gasStationWallet._id,
       walletRecord.address,
       config[protocol].minNativeForGas
     );
@@ -83,7 +84,8 @@ exports.processTradeJob = async (job) => {
     amount,
     config.quickswap.slippageTolerance,
     tokenInDoc,
-    tokenOutDoc
+    tokenOutDoc,
+    protocol
   );
 
   //5. Update wallet balances for both tokens concurrently.
@@ -128,10 +130,15 @@ async function triggerEmergencyRebalance(protocol, tokenInDoc, tokenOutDoc, amou
     console.log(`Initiating rebalance for ${tokenInDoc.tokenAddress}, amount: ${amount}`);
 
     const fundingWallet = await getFundingWallet();
-    const derivedWallet = await getDerivedWallet(fundingWallet);
-    const receipt = await transferService.executeTransfer(
+    const gasStationWallet = await getGasStationWallet();
+    const derivedFundingWallet = await getDerivedWallet(fundingWallet);
+    const derivedGasStationWallet = await getDerivedWallet(gasStationWallet);
+    const receipt = await TransferService.executeTransfer(
       protocol.toLowerCase(),
-      derivedWallet,
+      derivedFundingWallet,
+      fundingWallet.id,
+      derivedGasStationWallet,
+      gasStationWallet.id,
       tokenInDoc,
       tokenOutDoc,
       amount
@@ -147,4 +154,10 @@ async function getFundingWallet() {
   const fundingWallet = await Wallet.findOne({ status: 'active', type: WalletTypes.FUNDING }).lean();
   if (!fundingWallet) throw new Error('Funding wallet not found');
   return fundingWallet;
+}
+
+async function getGasStationWallet() {
+  const gasStationWallet = await Wallet.findOne({ status: 'active', type: WalletTypes.GAS_STATION }).lean();
+  if (!gasStationWallet) throw new Error('Gas station wallet not found');
+  return gasStationWallet;
 }

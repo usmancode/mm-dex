@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const { toJSON, paginate } = require('./plugins');
+const TxnStatus = require('../enums/txnStatus');
+const TxnTypes = require('../enums/txnTypes');
 
 const transactionSchema = mongoose.Schema(
   {
@@ -23,8 +25,29 @@ const transactionSchema = mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['pending', 'success', 'failed'],
-      default: 'pending',
+      enum: TxnStatus,
+      default: TxnStatus.PENDING,
+    },
+    params: {
+      type: mongoose.Schema.Types.Mixed,
+      required: false,
+    },
+    message: {
+      type: String,
+      required: false,
+    },
+    chainId: {
+      type: String,
+      required: false,
+    },
+    dex: {
+      type: String,
+      required: false,
+    },
+    txnType: {
+      type: String,
+      enum: TxnTypes,
+      required: false,
     },
   },
   {

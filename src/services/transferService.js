@@ -3,7 +3,9 @@ const { ethers } = require('ethers');
 const config = require('../config/config');
 const WalletUsage = require('../models/walletUsage.model');
 const balanceModel = require('../models/balance.model');
-
+const TransactionService = require('./transaction.service');
+const TxnStatus = require('../enums/txnStatus');
+const TxnTypes = require('../enums/txnTypes');
 class TransferService {
   constructor() {}
 
@@ -32,49 +34,178 @@ class TransferService {
     return selectedWallet.wallet;
   }
 
-  async transferNativeToken(signer, toAddress, amount, decimals) {
-    const tx = {
-      to: toAddress,
-      value: ethers.parseUnits(amount.toString(), decimals),
-    };
-    console.log('Native Token Transfer Transaction:', tx);
-    const txResponse = await signer.sendTransaction(tx);
-    return txResponse.wait();
+  async transferNativeToken(signer, toAddress, amount, decimals, derivedWalletId) {
+    let transaction;
+    try {
+      const tx = {
+        to: toAddress,
+        value: ethers.parseUnits(amount.toString(), decimals),
+      };
+      console.log('Native Token Transfer Transaction:', tx);
+      transaction = await TransactionService.createTransaction({
+        walletId: derivedWalletId,
+        amount: tx.value,
+        transactionHash: null,
+        status: TxnStatus.PENDING,
+        params: tx,
+        chainId: config.uniswap.chainId,
+        dex: config.uniswap.name,
+        txnType: TxnTypes.REBALANCING,
+        message: 'Transaction initiated',
+      });
+      const txResponse = await signer.sendTransaction(tx);
+      await TransactionService.updateTransaction(transaction.id, {
+        transactionHash: txResponse.hash,
+        message: 'Transaction submitted to network',
+      });
+      const receipt = await txResponse.wait();
+      await TransactionService.updateTransaction(transaction.id, {
+        status: receipt.status === 1 ? TxnStatus.SUCCESS : TxnStatus.FAILED,
+        message: receipt.status === 1 ? 'Transaction confirmed' : 'Transaction reverted',
+      });
+
+      return receipt;
+    } catch (error) {
+      if (transaction) {
+        await TransactionService.updateTransaction(transaction.id, {
+          status: TxnStatus.FAILED,
+          message: error.message || 'Transaction failed',
+        });
+      }
+      console.error('Native Token Transfer Error:', error);
+      throw error;
+    }
   }
 
-  async refillGas(signer, toAddress, amount) {
-    const tx = {
-      to: toAddress,
-      value: amount,
-    };
-    console.log('Refilling Gas Transaction:', tx);
-    const txResponse = await signer.sendTransaction(tx);
-    return txResponse.wait();
+  async refillGas(signer, toAddress, gasStationWalletId, amount) {
+    let transaction;
+    try {
+      const tx = {
+        to: toAddress,
+        value: amount,
+      };
+      console.log('Refilling Gas Transaction:', tx);
+      transaction = await TransactionService.createTransaction({
+        walletId: gasStationWalletId,
+        amount: amount,
+        transactionHash: null,
+        status: TxnStatus.PENDING,
+        params: tx,
+        chainId: config.uniswap.chainId,
+        dex: config.uniswap.name,
+        txnType: TxnTypes.GAS_REFILL,
+        message: 'Transaction initiated',
+      });
+
+      const txResponse = await signer.sendTransaction(tx);
+      await TransactionService.updateTransaction(transaction.id, {
+        transactionHash: txResponse.hash,
+        message: 'Transaction submitted to network',
+      });
+      const receipt = await txResponse.wait();
+      await TransactionService.updateTransaction(transaction.id, {
+        status: receipt.status === 1 ? TxnStatus.SUCCESS : TxnStatus.FAILED,
+        message: receipt.status === 1 ? 'Transaction confirmed' : 'Transaction reverted',
+      });
+
+      return receipt;
+    } catch (error) {
+      if (transaction) {
+        await TransactionService.updateTransaction(transaction.id, {
+          status: TxnStatus.FAILED,
+          message: error.message || 'Transaction failed',
+        });
+      }
+      console.error('Gas Refill Error:', error);
+      throw error;
+    }
   }
 
-  async refillGasForWallet(protocol, derivedWallet, toAddress, amount) {
-    const signer = await this.createSigner(protocol, derivedWallet);
+  async refillGasForWallet(protocol, derivedWallet, derivedWalletId, toAddress, amount) {
+    let transaction;
+    try {
+      const signer = await this.createSigner(protocol, derivedWallet);
+      const tx = {
+        to: toAddress,
+        value: amount,
+      };
+      console.log('Refilling Gas Transaction Before Executing Tx:', tx);
+      transaction = await TransactionService.createTransaction({
+        walletId: derivedWalletId,
+        amount: amount,
+        transactionHash: null,
+        status: TxnStatus.PENDING,
+        params: tx,
+        chainId: config.uniswap.chainId,
+        dex: config.uniswap.name,
+        txnType: TxnTypes.GAS_REFILL,
+        message: 'Transaction initiated',
+      });
+      const txResponse = await signer.sendTransaction(tx);
+      await TransactionService.updateTransaction(transaction.id, {
+        transactionHash: txResponse.hash,
+        message: 'Transaction submitted to network',
+      });
+      const receipt = await txResponse.wait();
+      await TransactionService.updateTransaction(transaction.id, {
+        status: receipt.status === 1 ? TxnStatus.SUCCESS : TxnStatus.FAILED,
+        message: receipt.status === 1 ? 'Transaction confirmed' : 'Transaction reverted',
+      });
 
-    const tx = {
-      to: toAddress,
-      value: amount,
-    };
-    console.log('Refilling Gas Transaction Before Executing Tx:', tx);
-    const txResponse = await signer.sendTransaction(tx);
-    return txResponse.wait();
+      return receipt;
+    } catch (error) {
+      if (transaction) {
+        await TransactionService.updateTransaction(transaction.id, {
+          status: TxnStatus.FAILED,
+          message: error.message || 'Transaction failed',
+        });
+      }
+      console.error('Gas Refill Error:', error);
+      throw error;
+    }
   }
 
-  async transferERC20Token(signer, tokenContractAddress, toAddress, amount, decimals) {
-    const erc20Abi = ['function transfer(address to, uint256 value)', 'function decimals()'];
-    const contract = new ethers.Contract(tokenContractAddress, erc20Abi, signer);
+  async transferERC20Token(signer, tokenContractAddress, toAddress, amount, decimals, derivedWalletId) {
+    let transaction;
+    try {
+      const erc20Abi = ['function transfer(address to, uint256 value)', 'function decimals()'];
+      const contract = new ethers.Contract(tokenContractAddress, erc20Abi, signer);
 
-    const parsedAmount = ethers.parseUnits(amount.toString(), decimals);
-    console.log('ERC20 Token Transfer Transaction:', { toAddress, parsedAmount });
-
-    const tx = await contract.transfer(toAddress, parsedAmount, {
-      gasLimit: 100000,
-    });
-    return tx.wait();
+      const parsedAmount = ethers.parseUnits(amount.toString(), decimals);
+      console.log('ERC20 Token Transfer Transaction:', { toAddress, parsedAmount });
+      transaction = await TransactionService.createTransaction({
+        walletId: derivedWalletId,
+        amount: parsedAmount,
+        transactionHash: null,
+        status: TxnStatus.PENDING,
+        params: { toAddress, parsedAmount },
+        chainId: config.uniswap.chainId,
+        dex: config.uniswap.name,
+        txnType: TxnTypes.REBALANCING,
+        message: 'Transaction initiated',
+      });
+      const txResponse = await contract.transfer(toAddress, parsedAmount, {
+        gasLimit: 100000,
+      });
+      await TransactionService.updateTransaction(transaction.id, {
+        transactionHash: txResponse.hash,
+        message: 'Transaction submitted to network',
+      });
+      const receipt = await txResponse.wait();
+      await TransactionService.updateTransaction(transaction.id, {
+        status: receipt.status === 1 ? TxnStatus.SUCCESS : TxnStatus.FAILED,
+        message: receipt.status === 1 ? 'Transaction confirmed' : 'Transaction reverted',
+      });
+    } catch (error) {
+      if (transaction) {
+        await TransactionService.updateTransaction(transaction.id, {
+          status: TxnStatus.FAILED,
+          message: error.message || 'Transaction failed',
+        });
+      }
+      console.error('ERC20 Transfer Error:', error);
+      throw error;
+    }
   }
 
   async checkNativeBalanceForGas(wallet, protocol) {
@@ -87,7 +218,16 @@ class TransferService {
     return true;
   }
 
-  async executeTransfer(protocol, derivedWallet, tokenInDoc, tokenOutDoc, amount) {
+  async executeTransfer(
+    protocol,
+    derivedWallet,
+    derivedWalletId,
+    gasStation,
+    gasStationWalletId,
+    tokenInDoc,
+    tokenOutDoc,
+    amount
+  ) {
     try {
       const signer = await this.createSigner(protocol, derivedWallet);
       let wallet;
@@ -98,7 +238,7 @@ class TransferService {
       }
 
       if (tokenInDoc.isNative) {
-        await this.transferNativeToken(signer, wallet.address, amount, tokenInDoc.decimals);
+        await this.transferNativeToken(signer, wallet.address, amount, tokenInDoc.decimals, derivedWalletId);
         await balanceModel.updateOne(
           { address: wallet.address, tokenAddress: tokenInDoc.tokenAddress },
           { $inc: { balance: amount.toString() } }
@@ -106,7 +246,14 @@ class TransferService {
         console.log(`Native token transfer successful to ${withdrawalAddress}`);
         return wallet;
       }
-      await this.transferERC20Token(signer, tokenInDoc.tokenAddress, wallet.address, amount, tokenInDoc.decimals);
+      await this.transferERC20Token(
+        signer,
+        tokenInDoc.tokenAddress,
+        wallet.address,
+        amount,
+        tokenInDoc.decimals,
+        derivedWalletId
+      );
       await balanceModel.updateOne(
         { address: wallet.address, tokenAddress: tokenInDoc.tokenAddress },
         { $inc: { balance: amount.toString() } }
@@ -114,7 +261,8 @@ class TransferService {
       console.log(`ERC20 token transfer successful to ${wallet.address}`);
       if (!(await this.checkNativeBalanceForGas(wallet, protocol))) {
         console.log(`Refilling gas for ${wallet.address}`, config[protocol].minNativeForGas);
-        await this.refillGas(signer, wallet.address, config[protocol].minNativeForGas);
+        const gasStationSigner = await this.createSigner(protocol, gasStation);
+        await this.refillGas(gasStationSigner, wallet.address, gasStationWalletId, config[protocol].minNativeForGas);
       }
       return wallet;
     } catch (error) {
