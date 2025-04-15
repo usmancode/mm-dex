@@ -4,7 +4,7 @@ const config = require('../config/config');
 const swaggerDef = {
   openapi: '3.0.0',
   info: {
-    title: 'D24 MM Bot API',
+    title: 'D24 Wallet Management And Trade  API',
     version,
     license: {
       name: 'MIT',
@@ -13,9 +13,8 @@ const swaggerDef = {
   },
   servers: [
     {
-      url: `http://localhost:${config.port}/v1`,
+      url: `${config.SWAGGER_URL}`,
     },
   ],
 };
-
 module.exports = swaggerDef;
