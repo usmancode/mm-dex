@@ -50,32 +50,34 @@ const router = express.Router();
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 docs:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Balance'
- *                 totalDocs:
- *                   type: integer
- *                 limit:
- *                   type: integer
- *                 page:
- *                   type: integer
- *                 totalPages:
- *                   type: integer
- *                 pagingCounter:
- *                   type: integer
- *                 hasPrevPage:
- *                   type: boolean
- *                 hasNextPage:
- *                   type: boolean
- *                 prevPage:
- *                   type: integer
- *                   nullable: true
- *                 nextPage:
- *                   type: integer
- *                   nullable: true
+ *               $ref: '#/components/schemas/BalanceResponse'
+ *             example:
+ *               results:
+ *                 - isNative: false
+ *                   token:
+ *                     tokenSymbol: "WETH"
+ *                     chainId: "8453"
+ *                     network: "Base"
+ *                     isNative: true
+ *                     decimals: 18
+ *                     pairAddress: null
+ *                     tokenAddress: "0x4200000000000000000000000000000000000006"
+ *                     id: "67d9fec8162129697215c97e"
+ *                   wallet:
+ *                     address: "0x0c76d83f945c56492F2aC163C604BeD94e73273c"
+ *                     aggregateBuyWeight: 0
+ *                     aggregateSellWeight: 0
+ *                     aggregateVolume: 0
+ *                     walletGenerationConfig: "67d9fec9162129697215c98a"
+ *                     status: "active"
+ *                     type: "NORMAL"
+ *                     id: "67d9ff648ebb0ffd9012b17a"
+ *                   balance: "101748083661717.99999999999999"
+ *                   id: "67f9d306379f195c670974b6"
+ *               page: 1
+ *               limit: 1
+ *               totalPages: 2239
+ *               totalResults: 2239
  *       "404":
  *         description: Token or wallet not found
  */
@@ -84,30 +86,76 @@ const router = express.Router();
  * @swagger
  * components:
  *   schemas:
+ *     BalanceResponse:
+ *       type: object
+ *       properties:
+ *         results:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/Balance'
+ *         page:
+ *           type: integer
+ *         limit:
+ *           type: integer
+ *         totalPages:
+ *           type: integer
+ *         totalResults:
+ *           type: integer
+ *
  *     Balance:
  *       type: object
  *       properties:
- *         _id:
- *           type: string
- *         wallet:
- *           type: string
+ *         isNative:
+ *           type: boolean
  *         token:
+ *           $ref: '#/components/schemas/Token'
+ *         wallet:
+ *           $ref: '#/components/schemas/Wallet'
+ *         balance:
  *           type: string
- *         amount:
+ *         id:
+ *           type: string
+ *
+ *     Token:
+ *       type: object
+ *       properties:
+ *         tokenSymbol:
+ *           type: string
+ *         chainId:
+ *           type: string
+ *         network:
+ *           type: string
+ *         isNative:
+ *           type: boolean
+ *         decimals:
+ *           type: integer
+ *         pairAddress:
+ *           type: string
+ *           nullable: true
+ *         tokenAddress:
+ *           type: string
+ *         id:
+ *           type: string
+ *
+ *     Wallet:
+ *       type: object
+ *       properties:
+ *         address:
+ *           type: string
+ *         aggregateBuyWeight:
  *           type: number
- *         createdAt:
+ *         aggregateSellWeight:
+ *           type: number
+ *         aggregateVolume:
+ *           type: number
+ *         walletGenerationConfig:
  *           type: string
- *           format: date-time
- *         updatedAt:
+ *         status:
  *           type: string
- *           format: date-time
- *       example:
- *         _id: "60d21b4667d0d8992e610c85"
- *         wallet: "60d21b4667d0d8992e610c99"
- *         token: "60d21b4667d0d8992e610c77"
- *         amount: 1000.50
- *         createdAt: "2023-01-01T00:00:00.000Z"
- *         updatedAt: "2023-01-01T00:00:00.000Z"
+ *         type:
+ *           type: string
+ *         id:
+ *           type: string
  */
 
 router.get('/', balanceController.listBalances);

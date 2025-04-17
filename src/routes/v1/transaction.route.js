@@ -85,21 +85,25 @@ const router = express.Router();
  *         name: status
  *         schema:
  *           type: string
+ *           enum: [PENDING, INPROCESS, SUCCESS, FAILED]
  *         description: Filter transactions by status.
  *       - in: query
  *         name: dex
  *         schema:
  *           type: string
+ *           enum: [uniswap,quickswap]
  *         description: Filter transactions by dex (e.g., "uniswap").
  *       - in: query
  *         name: txnType
  *         schema:
  *           type: string
+ *           enum: [SWAP, REBALANCING, GAS_TRANSFER, TOKEN_TRANSFER, GAS_REFILL, APPROVE]
  *         description: Filter transactions by transaction type (e.g., "SWAP").
  *       - in: query
  *         name: sortBy
  *         schema:
  *           type: string
+ *         description: Sort transactions by a specific field (e.g., "createdAt:asc,desc"."amount:asc,desc").
  *       - in: query
  *         name: limit
  *         schema:

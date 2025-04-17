@@ -27,10 +27,17 @@ const listBalances = async (req, res) => {
     sort: { updatedAt: -1 },
   });
 
-  const formattedResults = paginatedBalances.results.map((doc) => ({
-    ...doc.toJSON(),
-    balance: doc.balance.toString(),
-  }));
+  const formattedResults = paginatedBalances.results.map((doc) => {
+    const data = doc.toJSON();
+    if (data.wallet) {
+      const { hd_index, snapshot, ...restWallet } = data.wallet;
+      data.wallet = restWallet;
+    }
+    return {
+      ...data,
+      balance: doc.balance.toString(),
+    };
+  });
 
   res.json({
     ...paginatedBalances,

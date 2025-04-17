@@ -21,7 +21,7 @@ const getTransactions = async (req, res) => {
     // Process sorting according to plugin requirements
     let sortBy = '';
     if (req.query.sortBy) {
-      const validSortFields = ['createdAt', 'amount', 'status']; // Add other sortable fields
+      const validSortFields = ['createdAt', 'amount', 'updatedAt']; // Add other sortable fields
       const sortingCriteria = req.query.sortBy
         .split(',')
         .filter((criteria) => {
@@ -41,6 +41,8 @@ const getTransactions = async (req, res) => {
     };
 
     // Execute paginated query
+    console.log('Filter:', filter);
+    console.log('Options:', options);
     const result = await Transaction.paginate(filter, options);
 
     // Format Decimal128 values to string
