@@ -16,7 +16,7 @@ exports.getEligibleWalletForTrade = async (token, amount, decimals) => {
   const eligibleWallets = eligibleBalances.filter((balance) => balance.wallet);
   if (eligibleWallets.length === 0) {
     console.log('No eligible wallets found');
-    return null;
+    throw new Error('No eligible wallets found');
   }
   const randomIndex = Math.floor(Math.random() * eligibleWallets.length);
   const selectedBalance = eligibleWallets[randomIndex];

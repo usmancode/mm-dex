@@ -2,7 +2,7 @@ const Transaction = require('../models/transaction.model');
 const mongoose = require('mongoose');
 
 const transactionService = {
-  async createTransaction({ walletId, amount, transactionHash, status, params, chainId, dex, message, txnType }) {
+  async createTransaction({ walletId, amount, transactionHash, status, params, chainId, message, txnType, poolId }) {
     const processedParams = Object.entries(params).reduce((acc, [key, value]) => {
       acc[key] = value?.toString ? value.toString() : value;
       return acc;
@@ -16,7 +16,7 @@ const transactionService = {
       params: processedParams,
       message,
       chainId,
-      dex,
+      poolId,
       txnType,
     });
   },

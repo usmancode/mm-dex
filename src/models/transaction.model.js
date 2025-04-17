@@ -40,8 +40,9 @@ const transactionSchema = mongoose.Schema(
       type: String,
       required: false,
     },
-    dex: {
-      type: String,
+    poolId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Pool',
       required: false,
     },
     txnType: {

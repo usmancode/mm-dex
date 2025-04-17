@@ -1,6 +1,5 @@
 const express = require('express');
 const validate = require('../../middlewares/validate');
-const { apiKeyAuth } = require('../../middlewares/auth');
 const distReturnConfigValidation = require('../../validations/distReturnConfig.validation');
 const distReturnConfigController = require('../../controllers/distReturnConfig.controller');
 

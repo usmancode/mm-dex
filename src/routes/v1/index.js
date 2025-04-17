@@ -6,8 +6,11 @@ const transactionRoute = require('./transaction.route'); // Add this line
 const cryptoTokenRoute = require('./cryptoToken.route'); // Import cryptoToken route
 const schedulerConfigRoute = require('./schedulerConfig.route'); // Import SchedulerConfig route
 const walletGenerationConfigRoute = require('./walletGenerationConfig.route'); // Import WalletGenerationConfig route
+const poolRoute = require('./pool.route'); // Import pool route
+const walletRoute = require('./wallet.route');
 const config = require('../../config/config');
 const { apiKeyAuth } = require('../../middlewares/auth'); // Import apiKeyAuth
+const balanceRoute = require('./balance.route'); // Import balance route
 
 const router = express.Router();
 const devRoutes = [
@@ -49,6 +52,18 @@ const defaultRoutes = [
   {
     path: '/wallet-generation-configs',
     route: walletGenerationConfigRoute,
+  },
+  {
+    path: '/pools',
+    route: poolRoute,
+  },
+  {
+    path: '/balances',
+    route: balanceRoute,
+  },
+  {
+    path: '/wallets',
+    route: walletRoute,
   },
 ];
 

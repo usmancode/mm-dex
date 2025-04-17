@@ -16,7 +16,7 @@
     "trade": "cross-env NODE_ENV=development node src/workers/trade.jobProcessor.js",
     "queue": "cross-env NODE_ENV=development node queueStatus.js",
     "test": "jest -i --colors --verbose --detectOpenHandles",
-    "seed": "cross-env NODE_ENV=development node scripts/seedDefaultEntries.js",
+    "seed": "cross-env NODE_ENV=development node scripts/seedPool.js",
     "migration": "cross-env NODE_ENV=development node scripts/migrate.js",
     "test:watch": "jest -i --watchAll",
     "coverage": "jest -i --coverage",

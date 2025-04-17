@@ -8,6 +8,7 @@ const TransferService = require('./transferService');
 const WalletTypes = require('../enums/walletTypes');
 const Wallet = require('../models/wallet.model');
 const BalanceService = require('./balance.service');
+const Pool = require('../models/pool.model');
 
 const { getDerivedWallet, getGasStationWallet } = require('./walletService');
 
@@ -19,20 +20,52 @@ exports.enqueueTradeJob = async (tradeData) => {
   return job.id;
 };
 
-exports.processTradeJob = async (job) => {
-  const { tokenIn, tokenOut, amount, protocol } = job.data;
+const initialChecks = (pool) => {
+  if (!pool) {
+    throw new Error(`Pool not found for address: ${pool}`);
+  }
+  if (!pool.protocol) {
+    throw new Error(`Protocol not found for pool: ${pool}`);
+  }
+  if (!pool.active) {
+    throw new Error(`Pool is not active: ${pool}`);
+  }
+  if (!pool.token0 || !pool.token1) {
+    throw new Error(`Token0 or Token1 not found for pool: ${pool}`);
+  }
+  if (!pool.slippageTolerance) {
+    throw new Error(`Slippage tolerance not set for pool: ${pool}`);
+  }
+  if (!pool.feeTier) {
+    throw new Error(`Fee tier not set for pool: ${pool}`);
+  }
+  if (!pool.poolAddress) {
+    throw new Error(`Pool address not set for pool: ${pool}`);
+  }
+  if (!pool.chainId) {
+    throw new Error(`Chain ID not set for pool: ${pool}`);
+  }
+};
 
-  const tokenInDoc = await require('../models/cryptoToken.model').findById(tokenIn);
-  if (!tokenInDoc || !tokenInDoc.tokenAddress) {
-    throw new Error(`TokenIn document not found or missing tokenAddress: ${tokenIn}`);
+exports.processTradeJob = async (job) => {
+  const { action, amount, poolId } = job.data;
+
+  const pool = await Pool.findById(poolId).populate('token0 token1');
+
+  initialChecks(pool);
+
+  const tokenInDoc = action === 'buy' ? pool.token0 : pool.token1;
+  const tokenOutDoc = action === 'buy' ? pool.token1 : pool.token0;
+  if (!tokenInDoc || !tokenOutDoc) {
+    throw new Error(`TokenIn or TokenOut not found for pool: ${poolId}`);
   }
-  const tokenOutDoc = await require('../models/cryptoToken.model').findById(tokenOut);
-  if (!tokenOutDoc || !tokenOutDoc.tokenAddress) {
-    throw new Error(`TokenOut document not found or missing tokenAddress: ${tokenOut}`);
-  }
+  const tokenIn = tokenInDoc.id;
+  const tokenOut = tokenOutDoc.id;
+  const protocol = pool.protocol.toLowerCase();
+
   let walletRecord = await getEligibleWalletForTrade(tokenIn, amount, tokenInDoc.decimals);
   if (!walletRecord) {
-    walletRecord = await triggerEmergencyRebalance(protocol, tokenInDoc, tokenOutDoc, amount);
+    walletRecord = await triggerEmergencyRebalance(protocol, tokenInDoc, tokenOutDoc, amount, chainId);
     if (!walletRecord) {
       throw new Error('No wallet available for trade, even after emergency rebalancing.');
     }
@@ -55,7 +88,9 @@ exports.processTradeJob = async (job) => {
       derivedGasStationWallet,
       gasStationWallet._id,
       walletRecord.address,
-      config[protocol].minNativeForGas
+      config[protocol].minNativeForGas,
+      pool.chainId,
+      pool.id
     );
     console.log(`Gas balance refilled for ${walletRecord.address}`);
   }
@@ -63,10 +98,15 @@ exports.processTradeJob = async (job) => {
   const result = await adapter.executeTrade(
     derivedWallet,
     amount,
-    config.quickswap.slippageTolerance,
+    pool.slippageTolerance,
     tokenInDoc,
     tokenOutDoc,
-    protocol
+    protocol,
+    pool.poolAddress,
+    pool.chainId,
+    pool.feeTier,
+    protocol,
+    pool.id
   );
 
   if (result.decimalsIn && result.decimalsOut) {
@@ -100,7 +140,7 @@ exports.processTradeJob = async (job) => {
   return result;
 };
 
-async function triggerEmergencyRebalance(protocol, tokenInDoc, tokenOutDoc, amount) {
+async function triggerEmergencyRebalance(protocol, tokenInDoc, tokenOutDoc, amount, chainId) {
   try {
     console.log(`Initiating emergency rebalance for ${tokenInDoc.tokenAddress}, amount: ${amount}`);
     const fundingWallet = await getFundingWallet();
@@ -116,7 +156,8 @@ async function triggerEmergencyRebalance(protocol, tokenInDoc, tokenOutDoc, amou
       gasStationWallet.id,
       tokenInDoc,
       tokenOutDoc,
-      amount
+      amount,
+      chainId
     );
     return receipt;
   } catch (error) {

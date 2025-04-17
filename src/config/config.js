@@ -31,7 +31,7 @@ const envVarsSchema = Joi.object()
     ENCRYPTED_MASTER_SEED: Joi.string().required().description('Encrypted master seed in base64'),
     MASTER_SEED_VERSION: Joi.string().default('v1').description('Version of the master seed (e.g., v1, v2)'),
     QUICKNODE_RPC: Joi.string().description('QuickNode RPC endpoint'),
-    UNISWAP_ROUTER_ADDRESS: Joi.string().required().description('Uniswap Router contract address'),
+    UNISWAP_BASE_ROUTER_ADDRESS: Joi.string().required().description('Uniswap Router contract address'),
     QUICKSWAP_ROUTER_ADDRESS: Joi.string().required().description('QuickSwap Router contract address'),
     UNISWAP_WETH: Joi.string().required().description('WETH token address used in Uniswap swaps'),
     QUICKSWAP_WPOL: Joi.string().required().description('WPOL token address used in QuickSwap swaps'),
@@ -84,7 +84,7 @@ module.exports = {
     uniswap: envVars.QUICKNODE_RPC,
   },
   uniswap: {
-    routerAddress: envVars.UNISWAP_ROUTER_ADDRESS,
+    baseV3routerAddress: envVars.UNISWAP_BASE_ROUTER_ADDRESS,
     routerABI: require('../config/abis/UniswapV4Router.json'),
     WETH: envVars.UNISWAP_WETH,
     factoryAddress: envVars.UNISWAP_FACTORY_ADDRESS,

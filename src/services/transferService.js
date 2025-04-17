@@ -33,7 +33,7 @@ class TransferService {
     return selectedWallet.wallet;
   }
 
-  async transferNativeToken(signer, toAddress, amount, decimals, derivedWalletId) {
+  async transferNativeToken(signer, toAddress, amount, decimals, derivedWalletId, chainId, poolId) {
     let transaction;
     try {
       const tx = {
@@ -47,9 +47,9 @@ class TransferService {
         transactionHash: null,
         status: TxnStatus.PENDING,
         params: tx,
-        chainId: config.uniswap.chainId,
-        dex: config.uniswap.name,
+        chainId: chainId,
         txnType: TxnTypes.REBALANCING,
+        poolId: poolId,
         message: 'Transaction initiated',
       });
 
@@ -77,7 +77,7 @@ class TransferService {
     }
   }
 
-  async refillGas(signer, toAddress, gasStationWalletId, amount) {
+  async refillGas(signer, toAddress, gasStationWalletId, amount, chainId, poolId) {
     let transaction;
     try {
       const tx = {
@@ -91,9 +91,9 @@ class TransferService {
         transactionHash: null,
         status: TxnStatus.PENDING,
         params: tx,
-        chainId: config.uniswap.chainId,
-        dex: config.uniswap.name,
+        chainId: chainId,
         txnType: TxnTypes.GAS_REFILL,
+        poolId: poolId,
         message: 'Transaction initiated',
       });
 
@@ -121,7 +121,7 @@ class TransferService {
     }
   }
 
-  async refillGasForWallet(protocol, derivedWallet, derivedWalletId, toAddress, amount) {
+  async refillGasForWallet(protocol, derivedWallet, derivedWalletId, toAddress, amount, chainId, poolId) {
     let transaction;
     try {
       const signer = await this.createSigner(protocol, derivedWallet);
@@ -133,9 +133,9 @@ class TransferService {
         transactionHash: null,
         status: TxnStatus.PENDING,
         params: tx,
-        chainId: config.uniswap.chainId,
-        dex: config.uniswap.name,
+        chainId: chainId,
         txnType: TxnTypes.GAS_REFILL,
+        poolId: poolId,
         message: 'Transaction initiated',
       });
       const txResponse = await signer.sendTransaction(tx);
@@ -162,7 +162,7 @@ class TransferService {
     }
   }
 
-  async transferERC20Token(signer, tokenContractAddress, toAddress, amount, decimals, derivedWalletId) {
+  async transferERC20Token(signer, tokenContractAddress, toAddress, amount, decimals, derivedWalletId, chainId, poolId) {
     let transaction;
     try {
       const erc20Abi = ['function transfer(address to, uint256 value)', 'function decimals()'];
@@ -177,9 +177,9 @@ class TransferService {
         transactionHash: null,
         status: TxnStatus.PENDING,
         params: { toAddress, parsedAmount },
-        chainId: config.uniswap.chainId,
-        dex: config.uniswap.name,
+        chainId: chainId,
         txnType: TxnTypes.REBALANCING,
+        poolId: poolId,
         message: 'Transaction initiated',
       });
       const txResponse = await contract.transfer(toAddress, parsedAmount, { gasLimit: 100000 });
@@ -222,7 +222,9 @@ class TransferService {
     gasStationWalletId,
     tokenInDoc,
     tokenOutDoc,
-    amount
+    amount,
+    chainId,
+    poolId
   ) {
     try {
       const signer = await this.createSigner(protocol, derivedWallet);
@@ -236,7 +238,15 @@ class TransferService {
 
       if (tokenInDoc.isNative) {
         // Transfer native tokens
-        await this.transferNativeToken(signer, withdrawalWallet.address, amount, tokenInDoc.decimals, derivedWalletId);
+        await this.transferNativeToken(
+          signer,
+          withdrawalWallet.address,
+          amount,
+          tokenInDoc.decimals,
+          derivedWalletId,
+          chainId,
+          poolId
+        );
         await balanceModel.updateOne(
           { address: withdrawalWallet.address, tokenAddress: tokenInDoc.tokenAddress },
           { $inc: { balance: amount.toString() } }
@@ -252,7 +262,9 @@ class TransferService {
         withdrawalWallet.address,
         amount,
         tokenInDoc.decimals,
-        derivedWalletId
+        derivedWalletId,
+        chainId,
+        poolId
       );
       await balanceModel.updateOne(
         { address: withdrawalWallet.address, tokenAddress: tokenInDoc.tokenAddress },
@@ -268,7 +280,9 @@ class TransferService {
           gasStationSigner,
           withdrawalWallet.address,
           gasStationWalletId,
-          config[protocol].minNativeForGas
+          config[protocol].minNativeForGas,
+          chainId,
+          poolId
         );
       }
       return withdrawalWallet;

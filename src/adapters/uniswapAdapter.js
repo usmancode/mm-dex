@@ -11,7 +11,7 @@ const TransferService = require('../services/transferService');
 const { getWalletIdByAddress, getGasStationWallet, getDerivedWallet } = require('../services/walletService');
 const BalanceService = require('../services/balance.service');
 
-async function approveToken(tokenAddress, tokenABI, amount, signerWallet, swapRouterAddress) {
+async function approveToken(tokenAddress, tokenABI, amount, signerWallet, swapRouterAddress, chainId, poolId) {
   if (!amount || typeof amount === 'undefined') {
     throw new Error('Invalid amount parameter: cannot be undefined or null');
   }
@@ -62,9 +62,9 @@ async function approveToken(tokenAddress, tokenABI, amount, signerWallet, swapRo
       transactionHash: null,
       status: TxnStatus.PENDING,
       params: { router: swapRouterAddress, amount: approve100TimesAmount.toString() },
-      chainId: config.uniswap.chainId,
-      dex: config.uniswap.name,
+      chainId: chainId,
       txnType: TxnTypes.APPROVE,
+      poolId: poolId,
       message: 'Transaction initiated',
     });
     const approveTx = await tokenContract
@@ -146,14 +146,25 @@ async function calculateSwapAmounts(poolAddress, tokenIn, tokenOut, amountHuman,
   };
 }
 
-exports.executeTrade = async (wallet, amountHuman, slippageTolerance, tokenIn, tokenOut, protocol) => {
+exports.executeTrade = async (
+  wallet,
+  amountHuman,
+  slippageTolerance,
+  tokenIn,
+  tokenOut,
+  protocol,
+  poolAddress,
+  chainId,
+  feeTier,
+  protocolName,
+  poolId
+) => {
   let transaction;
   try {
     const provider = new ethers.JsonRpcProvider(config.rpc.quicknode);
     const signer = new ethers.Wallet(wallet.privateKey, provider);
-    const swapRouter = new ethers.Contract(config.uniswap.routerAddress, SWAP_ROUTER_ABI, signer);
+    const swapRouter = new ethers.Contract(config.uniswap.baseV3routerAddress, SWAP_ROUTER_ABI, signer);
 
-    const poolAddress = config.uniswap.poolAddress;
     const { amountIn, amountOutMin, decimalsIn, decimalsOut } = await calculateSwapAmounts(
       poolAddress,
       tokenIn,
@@ -164,11 +175,11 @@ exports.executeTrade = async (wallet, amountHuman, slippageTolerance, tokenIn, t
     );
 
     // 1) Approve token if needed
-    if (await approveToken(tokenIn.tokenAddress, ERC20_ABI, amountIn, signer, swapRouter.target)) {
+    if (await approveToken(tokenIn.tokenAddress, ERC20_ABI, amountIn, signer, swapRouter.target, chainId, poolId)) {
       const params = {
         tokenIn: tokenIn.tokenAddress,
         tokenOut: tokenOut.tokenAddress,
-        fee: config.uniswap.FEE_TIER,
+        fee: feeTier,
         recipient: signer.address,
         amountOutMinimum: amountOutMin,
         amountIn: amountIn,
@@ -178,16 +189,18 @@ exports.executeTrade = async (wallet, amountHuman, slippageTolerance, tokenIn, t
       console.log('params', params);
 
       // 2) Ensure we have enough gas (native token) in the wallet
-      const currentGasBalance = await BalanceService.balanceOf(null, signer.address, config.uniswap.name, true);
+      const currentGasBalance = await BalanceService.balanceOf(null, signer.address, protocolName, true);
       if (currentGasBalance < config[protocol].minNativeForGas) {
         const gasStationWallet = await getGasStationWallet();
         const derivedGasStationWallet = await getDerivedWallet(gasStationWallet);
         await TransferService.refillGasForWallet(
-          config.uniswap.name,
+          protocolName,
           derivedGasStationWallet,
           gasStationWallet._id,
           signer.address,
-          config[protocol].minNativeForGas
+          config[protocol].minNativeForGas,
+          chainId,
+          poolId
         );
       }
 
@@ -199,9 +212,9 @@ exports.executeTrade = async (wallet, amountHuman, slippageTolerance, tokenIn, t
         transactionHash: null,
         status: TxnStatus.PENDING,
         params: params,
-        chainId: config.uniswap.chainId,
-        dex: config.uniswap.name,
+        chainId: chainId,
         txnType: TxnTypes.SWAP,
+        poolId: poolId,
         message: 'Transaction initiated',
       });
 

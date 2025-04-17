@@ -45,7 +45,7 @@ module.exports = router;
  * /trade:
  *   post:
  *     summary: Initiate a token trade
- *     description: Execute a token swap using specified protocol
+ *     description: Execute a token swap using specified pool
  *     tags: [Trades]
  *     security:
  *       - apiKey: []
@@ -56,24 +56,20 @@ module.exports = router;
  *           schema:
  *             type: object
  *             required:
- *               - tokenIn
- *               - tokenOut
+ *               - action
  *               - amount
- *               - protocol
+ *               - poolId
  *             properties:
- *               tokenIn:
+ *               action:
  *                 type: string
- *                 example: "67d9fec8162129697215c981"
- *               tokenOut:
- *                 type: string
- *                 example: "67d9fec8162129697215c97e"
+ *                 example: "buy or sell"
  *               amount:
  *                 type: string
  *                 example: "1000"
- *               protocol:
- *                 type: string
- *                 enum: [uniswap, sushiswap, pancakeswap, quickswap]
- *                 example: "uniswap"
+ *               poolId:
+ *                 type: ObjectId
+ *                 reference: '#/components/schemas/Pool'
+ *                 example: "68003422d6146599a048e5cf"
  *     responses:
  *       "202":
  *         description: Trade request accepted
