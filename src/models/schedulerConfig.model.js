@@ -7,8 +7,7 @@ const schedulerConfigSchema = mongoose.Schema(
     name: {
       type: String,
       required: true,
-      unique: true,
-      enum: Object.values(SchedulerTypes), // restrict to known scheduler types
+      enum: Object.values(SchedulerTypes),
       description: "Name of the scheduler task (e.g., 'WalletGeneration', 'TokenDistribution')",
     },
     cronExpression: {
@@ -34,6 +33,9 @@ const schedulerConfigSchema = mongoose.Schema(
       type: Date,
       description: 'Last time the scheduler ran',
     },
+    lastModified: { type: Date, default: Date.now },
+    version: { type: Number, default: 1 },
+    triggerImmediately: { type: Boolean, default: false },
   },
   {
     timestamps: true,

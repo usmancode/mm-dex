@@ -33,7 +33,7 @@ const distReturnConfigSchema = mongoose.Schema(
       required: true,
       description: 'Maximum token amount to transfer per wallet',
     },
-    distributionEnabled: {
+    enabled: {
       type: Boolean,
       default: false,
       description: 'Whether distribution is currently enabled',

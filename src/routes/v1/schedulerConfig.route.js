@@ -17,28 +17,24 @@ const router = express.Router();
  *     SchedulerConfig:
  *       type: object
  *       properties:
- *         _id:
- *           type: string
- *           example: "67feca3e26ddec127324994d"
  *         name:
  *           type: string
- *           example: "My Scheduler"
+ *           enum: [WalletGeneration, TokenDistribution]
+ *           example: "WalletGeneration, TokenDistribution"
  *         enabled:
  *           type: boolean
  *           example: true
- *         cron:
+ *         cronExpression:
  *           type: string
  *           example: "0 0 * * *"
- *         params:
- *           type: object
- *         createdAt:
+ *         triggerImmediately:
+ *           type: boolean
+ *           example: false
+ *         description:
  *           type: string
- *           format: date-time
- *           example: "2025-04-15T21:06:06.520Z"
- *         updatedAt:
- *           type: string
- *           format: date-time
- *           example: "2025-04-15T21:06:14.946Z"
+ *           example: "Scheduler for my task"
+ *
+ *
  */
 
 /**
@@ -93,6 +89,21 @@ const router = express.Router();
  *                 totalResults:
  *                   type: integer
  *                   example: 1
+ *             example:
+ *               results:
+ *                 - name: "WalletGeneration"
+ *                   cronExpression: "* * * * *"
+ *                   description: "Scheduler for generating wallet addresses"
+ *                   enabled: false
+ *                   lastRun: "2025-04-18T01:01:07.737Z"
+ *                   lastModified: "2025-04-18T00:53:00.070Z"
+ *                   triggerImmediately: false
+ *                   version: 1
+ *                   id: "67d9fec9162129697215c990"
+ *               page: 1
+ *               limit: 1
+ *               totalPages: 2
+ *               totalResults: 2
  *   post:
  *     summary: Create a scheduler config
  *     description: Create a new scheduler config.
@@ -136,6 +147,10 @@ const router = express.Router();
  *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/SchedulerConfig'
+ *           example:
+ *             cronExpression: "* * * * *"
+ *             enabled: false
+ *             triggerImmediately: false
  *     responses:
  *       200:
  *         description: Scheduler config updated successfully.

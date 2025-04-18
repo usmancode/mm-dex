@@ -16,7 +16,13 @@ const getSchedulerConfigs = catchAsync(async (req, res) => {
 });
 
 const updateSchedulerConfig = catchAsync(async (req, res) => {
-  const schedulerConfig = await schedulerConfigService.updateSchedulerConfigById(req.params.schedulerConfigId, req.body);
+  const { triggerNow } = req.query;
+  const schedulerConfig = await schedulerConfigService.updateSchedulerConfigById(
+    req.params.schedulerConfigId,
+    req.body,
+    triggerNow === 'true'
+  );
+
   if (!schedulerConfig) {
     throw new ApiError(httpStatus.NOT_FOUND, 'SchedulerConfig not found');
   }

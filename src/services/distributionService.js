@@ -132,290 +132,283 @@ function generateRandomAllocations(totalAmount, minAmount, maxAmount, count) {
  * 7) For each success, do a short DB transaction (usage + status + balances + transactions).
  */
 async function distributeToActiveWallets(distConfig) {
-  try {
-    // 1) Basic checks & provider
-    const provider = new ethers.JsonRpcProvider(config.rpc.quicknode);
-    const networkInfo = await provider.getNetwork();
-    const chainId = networkInfo.chainId.toString();
+  // 1) Basic checks & provider
+  const provider = new ethers.JsonRpcProvider(config.rpc.quicknode);
+  const networkInfo = await provider.getNetwork();
+  const chainId = networkInfo.chainId.toString();
 
-    if (distConfig.tokenA.chainId.toString() !== chainId) {
-      throw new Error(`Chain ID mismatch: Config ${distConfig.tokenA.chainId} vs Network ${chainId}`);
-    }
+  if (distConfig.tokenA.chainId.toString() !== chainId) {
+    throw new Error(`Chain ID mismatch: Config ${distConfig.tokenA.chainId} vs Network ${chainId}`);
+  }
 
-    // 2) Load token docs
-    const tokenDoc = await CryptoToken.findById(distConfig.tokenA);
-    if (!tokenDoc) {
-      console.log('Token doc not found. Cannot distribute.');
-      return 0;
-    }
-    const nativeTokenDoc = await CryptoToken.findOne({
-      chainId: distConfig.tokenA.chainId,
-      isNative: true,
-    });
-    if (!nativeTokenDoc) {
-      console.log('Native token doc not found. Cannot distribute.');
-      return 0;
-    }
+  // 2) Load token docs
+  const tokenDoc = await CryptoToken.findById(distConfig.tokenA);
+  if (!tokenDoc) {
+    console.log('Token doc not found. Cannot distribute.');
+    throw new Error('Token doc not found. Cannot distribute.');
+  }
+  const nativeTokenDoc = await CryptoToken.findOne({
+    chainId: distConfig.tokenA.chainId,
+    isNative: true,
+  });
+  if (!nativeTokenDoc) {
+    console.log('Native token doc not found. Cannot distribute.');
+    throw new Error('Native token doc not found. Cannot distribute.');
+  }
+  if (distConfig.masterWallet.status !== 'active') {
+    console.log('Master wallet is not active. Cannot distribute.');
+    throw new Error('Master wallet is not active. Cannot distribute.');
+  }
 
-    // 3) Validate distribution amounts & min/max constraints
-    const totalNative = Number(distConfig.nativeDistributionAmount);
-    const totalToken = Number(distConfig.tokenDistributionAmount);
-    const minNative = Number(distConfig.minNativeDistributionAmount);
-    const maxNative = Number(distConfig.maxNativeDistributionAmount);
-    const minToken = Number(distConfig.minTokenDistributionAmount);
-    const maxToken = Number(distConfig.maxTokenDistributionAmount);
-    const activePoolSize = distConfig.activePoolSize;
+  // 3) Validate distribution amounts & min/max constraints
+  const totalNative = Number(distConfig.nativeDistributionAmount);
+  const totalToken = Number(distConfig.tokenDistributionAmount);
+  const minNative = Number(distConfig.minNativeDistributionAmount);
+  const maxNative = Number(distConfig.maxNativeDistributionAmount);
+  const minToken = Number(distConfig.minTokenDistributionAmount);
+  const maxToken = Number(distConfig.maxTokenDistributionAmount);
+  const activePoolSize = distConfig.activePoolSize;
 
-    // Check if total fits into min/max constraints
-    if (activePoolSize * minNative > totalNative || activePoolSize * maxNative < totalNative) {
-      throw new Error('Native distribution range does not allow full exhaustion of the allocated amount.');
-    }
-    if (activePoolSize * minToken > totalToken || activePoolSize * maxToken < totalToken) {
-      throw new Error('Token distribution range does not allow full exhaustion of the allocated amount.');
-    }
+  // Check if total fits into min/max constraints
+  if (activePoolSize * minNative > totalNative || activePoolSize * maxNative < totalNative) {
+    throw new Error('Native distribution range does not allow full exhaustion of the allocated amount.');
+  }
+  if (activePoolSize * minToken > totalToken || activePoolSize * maxToken < totalToken) {
+    throw new Error('Token distribution range does not allow full exhaustion of the allocated amount.');
+  }
 
-    // Count existing usage records
-    const existingCount = await WalletUsage.countDocuments({
-      tokenAddress: tokenDoc.tokenAddress,
-      pairAddress: tokenDoc.pairAddress,
-    });
-    if (existingCount >= activePoolSize) {
-      console.log('Sufficient active wallets. Skipping activation.');
-      return 0;
-    }
-
-    // 4) Randomly pick the needed number of inactive wallets
-    console.log(`Requested wallets: ${activePoolSize}`);
-    const targetWallets = await Wallet.aggregate([
-      { $match: { type: WalletTypes.NORMAL, status: 'inactive' } },
-      { $sample: { size: activePoolSize } },
-    ]);
-    if (!targetWallets.length) {
-      console.log('No inactive wallets found. Stopping.');
-      return 0;
-    }
-    // 5) Generate random allocations that sum exactly to the total amounts
-    console.log(
-      'totalNative, minNative, maxNative, targetWallets.length',
-      totalNative,
-      minNative,
-      maxNative,
-      targetWallets.length
-    );
-    const nativeAllocations = generateRandomAllocations(totalNative, minNative, maxNative, targetWallets.length);
-    console.log(
-      'totalToken, minToken, maxToken, targetWallets.length',
-      totalToken,
-      minToken,
-      maxToken,
-      targetWallets.length
-    );
-
-    const tokenAllocations = generateRandomAllocations(totalToken, minToken, maxToken, targetWallets.length);
-
-    // 6) On-chain distribution
-    const masterWallet = await getMasterWallet(provider, distConfig.masterWallet);
-
-    // Keep the existing BATCH_SIZE logic for your flow
-    const BATCH_SIZE = 20;
-    const batches = [];
-    for (let i = 0; i < targetWallets.length; i += BATCH_SIZE) {
-      batches.push(targetWallets.slice(i, i + BATCH_SIZE));
-    }
-
-    let totalDistributed = 0;
-    for (let bIndex = 0; bIndex < batches.length; bIndex++) {
-      const batch = batches[bIndex];
-      console.log('batch', batch);
-      console.log(`Processing batch ${bIndex + 1} of ${batches.length}...`);
-
-      // Fresh fee data for each batch
-      const feeData = await provider.getFeeData();
-      const baseFee = feeData.gasPrice != null ? feeData.gasPrice : feeData.maxFeePerGas - feeData.maxPriorityFeePerGas;
-      const maxPriorityFeePerGas = ethers.parseUnits(MAX_PRIORITY_FEE_GWEI.toString(), 'gwei');
-      let maxFeePerGas = ((baseFee + maxPriorityFeePerGas) * FEE_MULTIPLIER) / 10n;
-      if (maxFeePerGas < maxPriorityFeePerGas) {
-        maxFeePerGas = maxPriorityFeePerGas * 2n;
-      }
-
-      let currentNonce = BigInt(await provider.getTransactionCount(masterWallet.address, 'pending'));
-
-      // Loop through each wallet in the batch
-      for (let wIndex = 0; wIndex < batch.length; wIndex++) {
-        const wallet = batch[wIndex];
-        console.log(`Attempting on-chain distribution for wallet ${wallet.address}...`);
-
-        try {
-          // Assume the following constants are defined:
-          // GAS_BUFFER_PERCENTAGE, MAX_PRIORITY_FEE_GWEI, FEE_MULTIPLIER,
-          // FALLBACK_ETH_GAS = 21000n, etc.
-
-          // (A) Native Transfer
-          const nativeAllocStr = nativeAllocations[totalDistributed].toFixed(8);
-          const nativeAmount = ethers.parseEther(nativeAllocStr);
-
-          const feeData = await provider.getFeeData();
-          const computedPriorityFee =
-            feeData.maxPriorityFeePerGas &&
-            feeData.maxPriorityFeePerGas < ethers.parseUnits(MAX_PRIORITY_FEE_GWEI.toString(), 'gwei')
-              ? feeData.maxPriorityFeePerGas
-              : ethers.parseUnits(MAX_PRIORITY_FEE_GWEI.toString(), 'gwei');
-
-          const computedMaxFee = feeData.maxFeePerGas
-            ? (feeData.maxFeePerGas * BigInt(FEE_MULTIPLIER)) / 10n
-            : feeData.maxFeePerGas;
-
-          const nativeTxParams = {
-            to: wallet.address,
-            value: nativeAmount,
-            nonce: currentNonce,
-            chainId: networkInfo.chainId,
-            maxPriorityFeePerGas: computedPriorityFee,
-            maxFeePerGas: computedMaxFee,
-          };
-
-          // Check if the destination is an externally owned account (EOA)
-          const recipientCode = await provider.getCode(wallet.address);
-          if (recipientCode === '0x') {
-            // EOA: gas usage is standard, so avoid estimation overhead
-            nativeTxParams.gasLimit = FALLBACK_ETH_GAS;
-          } else {
-            try {
-              const est = await provider.estimateGas(nativeTxParams);
-              nativeTxParams.gasLimit = applyGasBuffer(est, FALLBACK_ETH_GAS);
-            } catch (err) {
-              console.error('Native gas estimation failed:', err.message);
-              nativeTxParams.gasLimit = FALLBACK_ETH_GAS;
-            }
-          }
-
-          const nativeTx = await masterWallet.sendTransaction(nativeTxParams);
-          console.log(`Sent ${nativeAllocStr} ETH to ${wallet.address}`);
-          const nativeReceipt = await nativeTx.wait();
-          currentNonce += 1n;
-
-          if (nativeReceipt.status !== 1) {
-            throw new Error(`Native transfer to ${wallet.address} reverted on-chain`);
-          }
-
-          // ---------- (B) ERC20 Token Transfer ----------
-
-          // Create the ERC20 token contract instance using your ABI and wallet
-          const erc20Contract = new ethers.Contract(tokenDoc.tokenAddress, MyTokenABI, masterWallet);
-
-          // Convert the allocation to the correct unit based on token decimals
-          const tokenAllocVal = tokenAllocations[totalDistributed];
-          const tokenAmount = ethers.parseUnits(tokenAllocVal.toString(), tokenDoc.decimals);
-
-          // Build the transaction parameters for the token transfer
-          const tokenTxParams = {
-            to: tokenDoc.tokenAddress,
-            data: erc20Contract.interface.encodeFunctionData('transfer', [wallet.address, tokenAmount]),
-            nonce: currentNonce,
-            chainId: networkInfo.chainId,
-            maxPriorityFeePerGas: computedPriorityFee,
-            maxFeePerGas: computedMaxFee,
-          };
-
-          try {
-            // Estimate gas usage; if successful, apply a buffer using your fallback value as the lower bound.
-            const est = await provider.estimateGas(tokenTxParams);
-            tokenTxParams.gasLimit = applyGasBuffer(est, FALLBACK_ERC20_GAS);
-          } catch (err) {
-            console.error('ERC20 gas estimation failed:', err.message);
-            tokenTxParams.gasLimit = FALLBACK_ERC20_GAS;
-          }
-
-          // Send the ERC20 token transfer transaction
-          const tokenTx = await masterWallet.sendTransaction(tokenTxParams);
-          console.log(`Sent ${tokenAllocVal} ${tokenDoc.tokenSymbol} to ${wallet.address}`);
-
-          // Wait for the transaction to be mined and update the nonce
-          const tokenReceipt = await tokenTx.wait();
-          currentNonce += 1n;
-
-          // Check that the transaction succeeded on-chain
-          if (tokenReceipt.status !== 1) {
-            throw new Error(`ERC20 transfer to ${wallet.address} reverted on-chain`);
-          }
-
-          // ---------- (C) Short DB Transaction ----------
-          const miniSession = await Wallet.startSession();
-          try {
-            await miniSession.startTransaction();
-
-            // Insert usage if needed
-            const existingUsage = await WalletUsage.findOne({
-              wallet: wallet._id,
-              tokenAddress: tokenDoc.tokenAddress,
-              pairAddress: tokenDoc.pairAddress,
-            }).session(miniSession);
-
-            if (!existingUsage) {
-              await WalletUsage.create(
-                [
-                  {
-                    wallet: wallet._id,
-                    chainId: networkInfo.chainId,
-                    tokenAddress: tokenDoc.tokenAddress,
-                    pairAddress: tokenDoc.pairAddress,
-                    hd_index: wallet.hd_index,
-                    address: wallet.address,
-                  },
-                ],
-                { session: miniSession }
-              );
-            }
-
-            // Mark wallet as active
-            await Wallet.updateOne({ _id: wallet._id }, { status: 'active' }, { session: miniSession });
-
-            // Update balances, insert transaction logs
-            await Balance.updateOne(
-              { wallet: wallet._id, token: nativeTokenDoc._id },
-              { $inc: { balance: nativeAmount.toString() } },
-              { session: miniSession, upsert: true }
-            );
-            await Transaction.create([createTransactionRecord(wallet, nativeTokenDoc, nativeReceipt, nativeAmount)], {
-              session: miniSession,
-            });
-
-            await Balance.updateOne(
-              { wallet: wallet._id, token: tokenDoc._id },
-              { $inc: { balance: tokenAmount.toString() } },
-              { session: miniSession, upsert: true }
-            );
-            await Transaction.create([createTransactionRecord(wallet, tokenDoc, tokenReceipt, tokenAmount, true)], {
-              session: miniSession,
-            });
-
-            await miniSession.commitTransaction();
-            miniSession.endSession();
-
-            totalDistributed++;
-            console.log(`Wallet ${wallet.address} successfully activated & funded.`);
-          } catch (dbErr) {
-            console.error('DB write transaction failed:', dbErr.message);
-            await miniSession.abortTransaction();
-            miniSession.endSession();
-            throw dbErr;
-          }
-        } catch (onChainErr) {
-          // If any error (on-chain or DB), stop distribution entirely
-          console.error(`Error distributing to wallet ${wallet.address}: ${onChainErr.message}`);
-          console.error(`Stopping immediately after ${totalDistributed} successful wallet(s).`);
-          return totalDistributed;
-        }
-      }
-    }
-
-    // Completed all addresses without major error
-    console.log(`Distribution completed successfully. Total distributed: ${totalDistributed}`);
-    return totalDistributed;
-  } catch (outerError) {
-    console.error('Uncaught error in distributeToActiveWallets:', outerError.message);
+  // Count existing usage records
+  const existingCount = await WalletUsage.countDocuments({
+    tokenAddress: tokenDoc.tokenAddress,
+    pairAddress: tokenDoc.pairAddress,
+  });
+  if (existingCount >= activePoolSize) {
+    console.log('Sufficient active wallets. Skipping activation.');
     return 0;
   }
+
+  // 4) Randomly pick the needed number of inactive wallets
+  console.log(`Requested wallets: ${activePoolSize}`);
+  const targetWallets = await Wallet.aggregate([
+    { $match: { type: WalletTypes.NORMAL, status: 'inactive' } },
+    { $sample: { size: activePoolSize } },
+  ]);
+  if (!targetWallets.length) {
+    console.log('No inactive wallets found. Stopping.');
+    return 0;
+  }
+  // 5) Generate random allocations that sum exactly to the total amounts
+  console.log(
+    'totalNative, minNative, maxNative, targetWallets.length',
+    totalNative,
+    minNative,
+    maxNative,
+    targetWallets.length
+  );
+  const nativeAllocations = generateRandomAllocations(totalNative, minNative, maxNative, targetWallets.length);
+  console.log('totalToken, minToken, maxToken, targetWallets.length', totalToken, minToken, maxToken, targetWallets.length);
+
+  const tokenAllocations = generateRandomAllocations(totalToken, minToken, maxToken, targetWallets.length);
+
+  // 6) On-chain distribution
+  const masterWallet = await getMasterWallet(provider, distConfig.masterWallet);
+
+  // Keep the existing BATCH_SIZE logic for your flow
+  const BATCH_SIZE = 20;
+  const batches = [];
+  for (let i = 0; i < targetWallets.length; i += BATCH_SIZE) {
+    batches.push(targetWallets.slice(i, i + BATCH_SIZE));
+  }
+
+  let totalDistributed = 0;
+  for (let bIndex = 0; bIndex < batches.length; bIndex++) {
+    const batch = batches[bIndex];
+    console.log('batch', batch);
+    console.log(`Processing batch ${bIndex + 1} of ${batches.length}...`);
+
+    // Fresh fee data for each batch
+    const feeData = await provider.getFeeData();
+    const baseFee = feeData.gasPrice != null ? feeData.gasPrice : feeData.maxFeePerGas - feeData.maxPriorityFeePerGas;
+    const maxPriorityFeePerGas = ethers.parseUnits(MAX_PRIORITY_FEE_GWEI.toString(), 'gwei');
+    let maxFeePerGas = ((baseFee + maxPriorityFeePerGas) * FEE_MULTIPLIER) / 10n;
+    if (maxFeePerGas < maxPriorityFeePerGas) {
+      maxFeePerGas = maxPriorityFeePerGas * 2n;
+    }
+
+    let currentNonce = BigInt(await provider.getTransactionCount(masterWallet.address, 'pending'));
+
+    // Loop through each wallet in the batch
+    for (let wIndex = 0; wIndex < batch.length; wIndex++) {
+      const wallet = batch[wIndex];
+      console.log(`Attempting on-chain distribution for wallet ${wallet.address}...`);
+
+      try {
+        // Assume the following constants are defined:
+        // GAS_BUFFER_PERCENTAGE, MAX_PRIORITY_FEE_GWEI, FEE_MULTIPLIER,
+        // FALLBACK_ETH_GAS = 21000n, etc.
+
+        // (A) Native Transfer
+        const nativeAllocStr = nativeAllocations[totalDistributed].toFixed(8);
+        const nativeAmount = ethers.parseEther(nativeAllocStr);
+
+        const feeData = await provider.getFeeData();
+        const computedPriorityFee =
+          feeData.maxPriorityFeePerGas &&
+          feeData.maxPriorityFeePerGas < ethers.parseUnits(MAX_PRIORITY_FEE_GWEI.toString(), 'gwei')
+            ? feeData.maxPriorityFeePerGas
+            : ethers.parseUnits(MAX_PRIORITY_FEE_GWEI.toString(), 'gwei');
+
+        const computedMaxFee = feeData.maxFeePerGas
+          ? (feeData.maxFeePerGas * BigInt(FEE_MULTIPLIER)) / 10n
+          : feeData.maxFeePerGas;
+
+        const nativeTxParams = {
+          to: wallet.address,
+          value: nativeAmount,
+          nonce: currentNonce,
+          chainId: networkInfo.chainId,
+          maxPriorityFeePerGas: computedPriorityFee,
+          maxFeePerGas: computedMaxFee,
+        };
+
+        // Check if the destination is an externally owned account (EOA)
+        const recipientCode = await provider.getCode(wallet.address);
+        if (recipientCode === '0x') {
+          // EOA: gas usage is standard, so avoid estimation overhead
+          nativeTxParams.gasLimit = FALLBACK_ETH_GAS;
+        } else {
+          try {
+            const est = await provider.estimateGas(nativeTxParams);
+            nativeTxParams.gasLimit = applyGasBuffer(est, FALLBACK_ETH_GAS);
+          } catch (err) {
+            console.error('Native gas estimation failed:', err.message);
+            nativeTxParams.gasLimit = FALLBACK_ETH_GAS;
+          }
+        }
+
+        const nativeTx = await masterWallet.sendTransaction(nativeTxParams);
+        console.log(`Sent ${nativeAllocStr} ETH to ${wallet.address}`);
+        const nativeReceipt = await nativeTx.wait();
+        currentNonce += 1n;
+
+        if (nativeReceipt.status !== 1) {
+          throw new Error(`Native transfer to ${wallet.address} reverted on-chain`);
+        }
+
+        // ---------- (B) ERC20 Token Transfer ----------
+
+        // Create the ERC20 token contract instance using your ABI and wallet
+        const erc20Contract = new ethers.Contract(tokenDoc.tokenAddress, MyTokenABI, masterWallet);
+
+        // Convert the allocation to the correct unit based on token decimals
+        const tokenAllocVal = tokenAllocations[totalDistributed];
+        const tokenAmount = ethers.parseUnits(tokenAllocVal.toString(), tokenDoc.decimals);
+
+        // Build the transaction parameters for the token transfer
+        const tokenTxParams = {
+          to: tokenDoc.tokenAddress,
+          data: erc20Contract.interface.encodeFunctionData('transfer', [wallet.address, tokenAmount]),
+          nonce: currentNonce,
+          chainId: networkInfo.chainId,
+          maxPriorityFeePerGas: computedPriorityFee,
+          maxFeePerGas: computedMaxFee,
+        };
+
+        try {
+          // Estimate gas usage; if successful, apply a buffer using your fallback value as the lower bound.
+          const est = await provider.estimateGas(tokenTxParams);
+          tokenTxParams.gasLimit = applyGasBuffer(est, FALLBACK_ERC20_GAS);
+        } catch (err) {
+          console.error('ERC20 gas estimation failed:', err.message);
+          tokenTxParams.gasLimit = FALLBACK_ERC20_GAS;
+        }
+
+        // Send the ERC20 token transfer transaction
+        const tokenTx = await masterWallet.sendTransaction(tokenTxParams);
+        console.log(`Sent ${tokenAllocVal} ${tokenDoc.tokenSymbol} to ${wallet.address}`);
+
+        // Wait for the transaction to be mined and update the nonce
+        const tokenReceipt = await tokenTx.wait();
+        currentNonce += 1n;
+
+        // Check that the transaction succeeded on-chain
+        if (tokenReceipt.status !== 1) {
+          throw new Error(`ERC20 transfer to ${wallet.address} reverted on-chain`);
+        }
+
+        // ---------- (C) Short DB Transaction ----------
+        const miniSession = await Wallet.startSession();
+        try {
+          await miniSession.startTransaction();
+
+          // Insert usage if needed
+          const existingUsage = await WalletUsage.findOne({
+            wallet: wallet._id,
+            tokenAddress: tokenDoc.tokenAddress,
+            pairAddress: tokenDoc.pairAddress,
+          }).session(miniSession);
+
+          if (!existingUsage) {
+            await WalletUsage.create(
+              [
+                {
+                  wallet: wallet._id,
+                  chainId: networkInfo.chainId,
+                  tokenAddress: tokenDoc.tokenAddress,
+                  pairAddress: tokenDoc.pairAddress,
+                  hd_index: wallet.hd_index,
+                  address: wallet.address,
+                },
+              ],
+              { session: miniSession }
+            );
+          }
+
+          // Mark wallet as active
+          await Wallet.updateOne({ _id: wallet._id }, { status: 'active' }, { session: miniSession });
+
+          // Update balances, insert transaction logs
+          await Balance.updateOne(
+            { wallet: wallet._id, token: nativeTokenDoc._id },
+            { $inc: { balance: nativeAmount.toString() } },
+            { session: miniSession, upsert: true }
+          );
+          await Transaction.create([createTransactionRecord(wallet, nativeTokenDoc, nativeReceipt, nativeAmount)], {
+            session: miniSession,
+          });
+
+          await Balance.updateOne(
+            { wallet: wallet._id, token: tokenDoc._id },
+            { $inc: { balance: tokenAmount.toString() } },
+            { session: miniSession, upsert: true }
+          );
+          await Transaction.create([createTransactionRecord(wallet, tokenDoc, tokenReceipt, tokenAmount, true)], {
+            session: miniSession,
+          });
+
+          await miniSession.commitTransaction();
+          miniSession.endSession();
+
+          totalDistributed++;
+          console.log(`Wallet ${wallet.address} successfully activated & funded.`);
+        } catch (dbErr) {
+          console.error('DB write transaction failed:', dbErr.message);
+          await miniSession.abortTransaction();
+          miniSession.endSession();
+          throw dbErr;
+        }
+      } catch (onChainErr) {
+        // If any error (on-chain or DB), stop distribution entirely
+        console.error(`Error distributing to wallet ${wallet.address}: ${onChainErr.message}`);
+        console.error(`Stopping immediately after ${totalDistributed} successful wallet(s).`);
+        return totalDistributed;
+      }
+    }
+  }
+
+  // Completed all addresses without major error
+  console.log(`Distribution completed successfully. Total distributed: ${totalDistributed}`);
+  return totalDistributed;
 }
 
 module.exports = {
