@@ -21,6 +21,11 @@ const balanceSchema = mongoose.Schema(
       type: mongoose.Schema.Types.Decimal128,
       default: 0,
     },
+    chainId: {
+      type: String,
+      required: false,
+      description: 'Blockchain chain ID',
+    },
     snapshot: {
       type: mongoose.Schema.Types.Mixed,
       default: {},

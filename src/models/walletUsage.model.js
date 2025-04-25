@@ -40,9 +40,10 @@ const walletUsageSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
-    pairAddress: {
-      type: String,
-      default: null,
+    pool: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Pool',
+      required: false,
     },
   },
   {

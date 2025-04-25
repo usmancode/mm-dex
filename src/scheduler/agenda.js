@@ -7,7 +7,7 @@ const cronValidator = require('cron-validator'); // Add missing import
 const JOB_CONFIGURATION = {
   WalletGeneration: {
     agendaName: 'wallet generation',
-    concurrency: 1, // Prevent overlapping jobs
+    concurrency: 1,
   },
   TokenDistribution: {
     agendaName: 'token distribution',

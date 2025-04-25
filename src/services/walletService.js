@@ -31,10 +31,6 @@ async function getHDWallet(derivationPath) {
   });
 
   const { Plaintext } = await kms.send(decryptCommand);
-
-  // For testing only: log the decrypted seed in base64 format.
-  console.log('Decrypted seed (base64):', Buffer.from(Plaintext).toString('base64'));
-
   // Create an HD wallet from the decrypted seed using the provided derivation path.
   const hdWallet = HDNodeWallet.fromSeed(Plaintext, derivationPath);
   return hdWallet;

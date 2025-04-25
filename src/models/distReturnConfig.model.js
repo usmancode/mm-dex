@@ -1,6 +1,17 @@
 const mongoose = require('mongoose');
 const { toJSON, paginate } = require('./plugins');
+const { Schema } = mongoose;
 
+const decimalFields = [
+  'nativeDistributionAmount',
+  'tokenDistributionAmount',
+  'minNativeDistributionAmount',
+  'maxNativeDistributionAmount',
+  'minTokenDistributionAmount',
+  'maxTokenDistributionAmount',
+  'maxNativeLeftOver',
+  'maxTokenLeftOver',
+];
 const distReturnConfigSchema = mongoose.Schema(
   {
     nativeDistributionAmount: {
@@ -53,13 +64,13 @@ const distReturnConfigSchema = mongoose.Schema(
       required: true,
       description: 'Distribution configuration expiration date and time',
     },
-    tokenA: {
+    token0: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'CryptoToken',
       required: true,
       description: 'Reference to the Token A configuration',
     },
-    tokenB: {
+    token1: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'CryptoToken',
       required: false,
@@ -99,18 +110,35 @@ const distReturnConfigSchema = mongoose.Schema(
       required: false,
       description: 'Reference to the wallet doc to use as the master wallet for distribution/returns',
     },
+    pool: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Pool',
+      required: false,
+      description: 'Reference to the pool doc to use for distribution/returns',
+    },
   },
   {
     timestamps: true,
+    toJSON: {
+      virtuals: true,
+      versionKey: false,
+      transform: (doc, ret) => {
+        decimalFields.forEach((field) => {
+          if (ret[field] instanceof mongoose.Types.Decimal128) {
+            ret[field] = parseFloat(ret[field].toString());
+          }
+        });
+        ret.id = ret._id;
+        delete ret._id;
+        return ret;
+      },
+    },
   }
 );
 
-// Optimized Indexes
 distReturnConfigSchema.index({ network: 1, chainId: 1 });
 distReturnConfigSchema.index({ enabled: 1 });
 distReturnConfigSchema.index({ expireAt: 1 });
-distReturnConfigSchema.index({ tokenA: 1 });
-distReturnConfigSchema.index({ tokenA: 1, tokenB: 1 });
 
 distReturnConfigSchema.plugin(toJSON);
 distReturnConfigSchema.plugin(paginate);

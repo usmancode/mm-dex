@@ -35,9 +35,10 @@ async function runSchedulerTask(schedulerName) {
     } else if (schedulerName === SchedulerTypes.TOKEN_DISTRIBUTION) {
       const DistReturnConfig = require('../models/distReturnConfig.model');
       const distConfigs = await DistReturnConfig.find({ enabled: true })
-        .populate('tokenA')
-        .populate('tokenB')
-        .populate('masterWallet');
+        .populate('token0')
+        .populate('token1')
+        .populate('masterWallet')
+        .populate('pool');
       for (const config of distConfigs) {
         console.log(`Distributing tokens for network ${config}`);
         const count = await distributeToActiveWallets(config);
@@ -45,7 +46,10 @@ async function runSchedulerTask(schedulerName) {
         affectedRows += count || 0;
       }
 
-      const returnConfigs = await DistReturnConfig.find({ returnEnabled: true }).populate('tokenA').populate('tokenB');
+      const returnConfigs = await DistReturnConfig.find({ returnEnabled: true })
+        .populate('token0')
+        .populate('token1')
+        .populate('pool');
 
       for (const config of returnConfigs) {
         const count = await returnAllFundsToMaster(config);

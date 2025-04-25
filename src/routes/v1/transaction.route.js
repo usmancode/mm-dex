@@ -1,9 +1,4 @@
-// routes/transactions.js
-
 const express = require('express');
-// Uncomment and adjust the following lines if you use validation middleware
-// const validate = require('../../middlewares/validate');
-// const transactionValidation = require('../../validations/transaction.validation');
 const transactionController = require('../../controllers/transaction.controller');
 
 const router = express.Router();
@@ -12,7 +7,7 @@ const router = express.Router();
  * @swagger
  * tags:
  *   name: Transactions
- *   description: Transaction management
+ *   description: Blockchain transaction management
  */
 
 /**
@@ -22,77 +17,104 @@ const router = express.Router();
  *     Transaction:
  *       type: object
  *       properties:
- *         _id:
+ *         id:
  *           type: string
- *           example: "67feca3e26ddec127324994d"
+ *           example: "65f7eb5c86a94534d8b456a3"
  *         wallet:
- *           type: string
- *           example: "67fa5cbc0fa0f3e8571d6ce3"
+ *           $ref: '#/components/schemas/Wallet'
  *         amount:
- *           type: string
- *           example: "100000000000000000000"
+ *           type: number
+ *           example: 0.0019
  *         transactionHash:
  *           type: string
  *           example: "0x04be36c060f316695c39cebca89f9c2faec4ea80812a9fd66e1cabad71e9a0fb"
  *         status:
  *           type: string
+ *           enum: [PENDING, INPROCESS, SUCCESS, FAILED]
  *           example: "SUCCESS"
  *         params:
  *           type: object
+ *           additionalProperties: true
  *         message:
  *           type: string
  *           example: "Transaction confirmed"
  *         chainId:
  *           type: string
  *           example: "8453"
- *         dex:
- *           type: string
- *           example: "uniswap"
  *         txnType:
  *           type: string
+ *           enum: [SWAP, REBALANCING, GAS_TRANSFER, TOKEN_TRANSFER, GAS_REFILL, APPROVE]
  *           example: "SWAP"
  *         createdAt:
  *           type: string
  *           format: date-time
- *           example: "2025-04-15T21:06:06.520Z"
+ *           example: "2024-03-19T10:00:00.000Z"
  *         updatedAt:
  *           type: string
  *           format: date-time
- *           example: "2025-04-15T21:06:14.946Z"
+ *           example: "2024-03-19T10:05:00.000Z"
+ *     Wallet:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           example: "65f7eb5c86a94534d8b456a3"
+ *         address:
+ *           type: string
+ *           example: "0xCEc5933d94618B64413a8161cd6B8b68b2F439B9"
+ *         type:
+ *           type: string
+ *           example: "NORMAL"
+ *         status:
+ *           type: string
+ *           example: "active"
+ *     PaginatedTransactions:
+ *       type: object
+ *       properties:
+ *         results:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/Transaction'
+ *         page:
+ *           type: integer
+ *           example: 1
+ *         limit:
+ *           type: integer
+ *           example: 10
+ *         totalPages:
+ *           type: integer
+ *           example: 5
+ *         totalResults:
+ *           type: integer
+ *           example: 50
  */
 
 /**
  * @swagger
  * /transactions:
  *   get:
- *     summary: Get a list of transactions
- *     description: Retrieve all transactions with optional filtering by id, transactionHash, status, dex, txnType, sorting, and pagination.
+ *     summary: Get paginated transactions
+ *     description: Retrieve transactions with advanced filtering, sorting, and pagination
  *     tags: [Transactions]
  *     security:
  *      - apiKey: []
  *     parameters:
  *       - in: query
- *         name: id
+ *         name: walletAddress
  *         schema:
  *           type: string
- *         description: Filter transactions by the transaction's MongoDB ObjectId.
+ *         description: Filter by associated wallet address
  *       - in: query
  *         name: transactionHash
  *         schema:
  *           type: string
- *         description: Filter transactions by transaction hash.
+ *         description: Filter by transaction hash
  *       - in: query
  *         name: status
  *         schema:
  *           type: string
  *           enum: [PENDING, INPROCESS, SUCCESS, FAILED]
- *         description: Filter transactions by status.
- *       - in: query
- *         name: dex
- *         schema:
- *           type: string
- *           enum: [uniswap,quickswap]
- *         description: Filter transactions by dex (e.g., "uniswap").
+ *         description: Filter by transaction status
  *       - in: query
  *         name: txnType
  *         schema:
@@ -109,44 +131,31 @@ const router = express.Router();
  *         schema:
  *           type: integer
  *           minimum: 1
+ *           maximum: 100
  *           default: 10
- *         description: Maximum number of transactions to return.
+ *         description: Maximum number of results per page
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
  *           minimum: 1
  *           default: 1
- *         description: Page number for pagination.
+ *         description: Page number
  *     responses:
  *       200:
- *         description: A paginated list of transactions.
+ *         description: Paginated list of transactions
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 results:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Transaction'
- *                 page:
- *                   type: integer
- *                   example: 1
- *                 limit:
- *                   type: integer
- *                   example: 10
- *                 totalPages:
- *                   type: integer
- *                   example: 1
- *                 totalResults:
- *                   type: integer
- *                   example: 1
+ *               $ref: '#/components/schemas/PaginatedTransactions'
+ *       400:
+ *         description: Invalid request parameters
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
  */
 
-router
-  .route('/')
-
-  .get(transactionController.getTransactions);
+router.route('/').get(transactionController.getTransactions);
 
 module.exports = router;
