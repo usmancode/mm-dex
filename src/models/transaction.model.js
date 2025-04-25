@@ -23,9 +23,7 @@ const transactionSchema = mongoose.Schema(
     },
     transactionHash: {
       type: String,
-      index: true,
       required: false,
-      unique: true,
     },
     status: {
       type: String,
@@ -74,7 +72,7 @@ const transactionSchema = mongoose.Schema(
 
 transactionSchema.index({ createdAt: -1 });
 transactionSchema.index({ wallet: 1, status: 1 });
-transactionSchema.index({ transactionHash: 1, status: 1 });
+transactionSchema.index({ status: 1 });
 
 transactionSchema.plugin(toJSON);
 transactionSchema.plugin(paginate);

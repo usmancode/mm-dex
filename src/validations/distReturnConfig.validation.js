@@ -21,6 +21,8 @@ const getDistReturnConfigs = {
     sortBy: Joi.string().optional(),
     limit: Joi.number().optional(),
     page: Joi.number().optional(),
+    enabled: Joi.boolean().optional(),
+    configName: Joi.string().optional(),
   }),
 };
 

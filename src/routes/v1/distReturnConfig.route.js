@@ -50,13 +50,13 @@ module.exports = router;
  *               configValue:
  *                 type: object
  *                 description: Configuration values object
- *               isActive:
+ *               enabled:
  *                 type: boolean
  *                 default: true
  *             example:
  *               configName: premiumReturns
  *               configValue: { tier1: 0.15, tier2: 0.20 }
- *               isActive: true
+ *               enabled: true
  *     responses:
  *       "201":
  *         description: Created
@@ -84,7 +84,7 @@ module.exports = router;
  *           type: string
  *         description: Configuration name filter
  *       - in: query
- *         name: isActive
+ *         name: enabled
  *         schema:
  *           type: boolean
  *         description: Filter by active status
@@ -186,17 +186,14 @@ module.exports = router;
  *         application/json:
  *           schema:
  *             type: object
- *             properties:
- *               configName:
- *                 type: string
- *               configValue:
- *                 type: object
- *               isActive:
- *                 type: boolean
  *             example:
- *               configName: updatedName
- *               configValue: { tier1: 0.18, tier2: 0.25 }
- *               isActive: false
+ *               nativeDistributionAmount: 0.01
+ *               tokenDistributionAmount: 0.001
+ *               minNativeDistributionAmount: 0.001
+ *               maxNativeDistributionAmount: 0.1
+ *               minTokenDistributionAmount: 0.001
+ *               maxTokenDistributionAmount: 0.1
+ *               activePoolSize: 100
  *     responses:
  *       "200":
  *         description: OK
@@ -253,20 +250,95 @@ module.exports = router;
  *         configValue:
  *           type: object
  *           description: Configuration values object
- *         isActive:
- *           type: boolean
- *           description: Whether the config is active
  *         createdAt:
  *           type: string
  *           format: date-time
  *         updatedAt:
  *           type: string
  *           format: date-time
+ *         nativeDistributionAmount:
+ *           type: number
+ *           description: Total native funds (e.g., ETH) allocated for distribution
+ *         tokenDistributionAmount:
+ *           type: number
+ *           description: Total token funds allocated for distribution
+ *         minNativeDistributionAmount:
+ *           type: number
+ *           description: Minimum native amount to transfer per wallet
+ *         maxNativeDistributionAmount:
+ *           type: number
+ *           description: Maximum native amount to transfer per wallet
+ *         minTokenDistributionAmount:
+ *           type: number
+ *           description: Minimum token amount to transfer per wallet
+ *         maxTokenDistributionAmount:
+ *           type: number
+ *           description: Maximum token amount to transfer per wallet
+ *         activePoolSize:
+ *           type: number
+ *           description: Number of wallets in the active pool for distribution
  *       example:
  *         _id: "60d21b4667d0d8992e610c85"
  *         configName: "premiumReturns"
  *         configValue: { "tier1": 0.15, "tier2": 0.20 }
- *         isActive: true
+ *         enabled: true
  *         createdAt: "2023-01-01T00:00:00.000Z"
  *         updatedAt: "2023-01-01T00:00:00.000Z"
+ *         nativeDistributionAmount: 0.01
+ *         tokenDistributionAmount: 0.001
+ *         minNativeDistributionAmount: 0.001
+ *         maxNativeDistributionAmount: 0.1
+ *         minTokenDistributionAmount: 0.001
+ *         maxTokenDistributionAmount: 0.1
+ *         activePoolSize: 100
+ */
+
+/**
+ * @swagger
+ * components:
+ *   responses:
+ *     DuplicateKey:
+ *       description: Duplicate key error
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               message:
+ *                 type: string
+ *             example:
+ *               message: "Duplicate key error"
+ *     Unauthorized:
+ *       description: Unauthorized
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               message:
+ *                 type: string
+ *             example:
+ *               message: "Unauthorized"
+ *     Forbidden:
+ *       description: Forbidden
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               message:
+ *                 type: string
+ *             example:
+ *               message: "Forbidden"
+ *     NotFound:
+ *       description: Not Found
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               message:
+ *                 type: string
+ *             example:
+ *               message: "Not Found"
  */

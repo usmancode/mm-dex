@@ -5,6 +5,7 @@ const balanceModel = require('../models/balance.model');
 const TransactionService = require('./transaction.service');
 const TxnStatus = require('../enums/txnStatus');
 const TxnTypes = require('../enums/txnTypes');
+const Pool = require('../models/pool.model');
 class TransferService {
   constructor() {}
 
@@ -204,10 +205,10 @@ class TransferService {
     }
   }
 
-  async checkNativeBalanceForGas(wallet, protocol) {
+  async checkNativeBalanceForGas(wallet, protocol, minGasBalance) {
     const provider = await this.createProvider(protocol);
     const balance = await provider.getBalance(wallet.address);
-    if (balance < config[protocol].minNativeForGas) {
+    if (balance < minGasBalance) {
       console.log(`Low native balance for gas on ${protocol}: ${wallet.address}`);
       return false;
     }
@@ -271,19 +272,14 @@ class TransferService {
         { $inc: { balance: amount.toString() } }
       );
       console.log(`ERC20 token transfer successful to ${withdrawalWallet.address}`);
+      const minGasBalance = await Pool.findById(poolId).then((pool) => pool.minGasBalance);
+      console.log('minGasBalance', minGasBalance);
 
       // Ensure the receiving wallet has enough gas
-      if (!(await this.checkNativeBalanceForGas(withdrawalWallet, protocol))) {
-        console.log(`Refilling gas for ${withdrawalWallet.address}`, config[protocol].minNativeForGas);
+      if (!(await this.checkNativeBalanceForGas(withdrawalWallet, protocol, minGasBalance))) {
+        console.log(`Refilling gas for ${withdrawalWallet.address}`);
         const gasStationSigner = await this.createSigner(protocol, gasStation);
-        await this.refillGas(
-          gasStationSigner,
-          withdrawalWallet.address,
-          gasStationWalletId,
-          config[protocol].minNativeForGas,
-          chainId,
-          poolId
-        );
+        await this.refillGas(gasStationSigner, withdrawalWallet.address, gasStationWalletId, minGasBalance, chainId, poolId);
       }
       return withdrawalWallet;
     } catch (error) {

@@ -9,7 +9,7 @@ const createDistReturnConfig = catchAsync(async (req, res) => {
 });
 
 const getDistReturnConfigs = catchAsync(async (req, res) => {
-  const filter = pick(req.query, ['name', 'role']);
+  const filter = pick(req.query, ['name', 'enabled']);
   const options = pick(req.query, ['sortBy', 'limit', 'page']);
 
   const distReturnConfigs = await distReturnConfigService.queryDistReturnConfigs(filter, options);

@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 const { toJSON, paginate } = require('./plugins');
-const { Schema } = mongoose;
 
 const decimalFields = [
   'nativeDistributionAmount',
@@ -128,8 +127,6 @@ const distReturnConfigSchema = mongoose.Schema(
             ret[field] = parseFloat(ret[field].toString());
           }
         });
-        ret.id = ret._id;
-        delete ret._id;
         return ret;
       },
     },

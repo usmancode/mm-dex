@@ -4,13 +4,13 @@ const { getEligibleWalletForTrade } = require('./walletEligibility.service');
 const protocolAdapters = require('../adapters/protocolAdapters');
 const config = require('../config/config');
 const balanceModel = require('../models/balance.model');
-const TransferService = require('./transferService');
+const TransferService = require('./transfer.service');
 const WalletTypes = require('../enums/walletTypes');
 const Wallet = require('../models/wallet.model');
 const BalanceService = require('./balance.service');
 const Pool = require('../models/pool.model');
 
-const { getDerivedWallet, getGasStationWallet } = require('./walletService');
+const { getDerivedWallet, getGasStationWallet } = require('./wallet.service');
 
 exports.enqueueTradeJob = async (tradeData) => {
   const job = await tradeQueue.add('trade', tradeData, {
@@ -79,7 +79,8 @@ exports.processTradeJob = async (job) => {
   }
 
   const gasBalance = await BalanceService.balanceOf(config.nativeTokenAddress, walletRecord.address, protocol, true);
-  if (gasBalance < config[protocol].minNativeForGas) {
+  const minNativeForGas = Number(pool.minNativeForGas.toString());
+  if (gasBalance < minNativeForGas) {
     console.log(`Insufficient gas in wallet ${walletRecord.address} on ${protocol}. Refilling now...`);
     const gasStationWallet = await getGasStationWallet();
     const derivedGasStationWallet = await getDerivedWallet(gasStationWallet);
@@ -88,7 +89,7 @@ exports.processTradeJob = async (job) => {
       derivedGasStationWallet,
       gasStationWallet._id,
       walletRecord.address,
-      config[protocol].minNativeForGas,
+      minNativeForGas,
       pool.chainId,
       pool.id
     );

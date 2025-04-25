@@ -1,7 +1,7 @@
 const { Agenda } = require('agenda');
 const config = require('../config/config'); // Your config with MongoDB URL
 const SchedulerConfig = require('../models/schedulerConfig.model');
-const { runSchedulerTask } = require('../services/schedulerService');
+const { runSchedulerTask } = require('../services/scheduler.service');
 const cronValidator = require('cron-validator'); // Add missing import
 
 const JOB_CONFIGURATION = {

@@ -1,10 +1,10 @@
 const SchedulerConfig = require('../models/schedulerConfig.model');
 const SchedulerLog = require('../models/schedulerLog.model');
-const { generateWalletsForConfig } = require('./walletGenerationService');
-const { distributeToActiveWallets } = require('./distributionService');
-const { returnAllFundsToMaster } = require('./returnService');
+const { generateWalletsForConfig } = require('./walletGeneration.service');
+const { distributeToActiveWallets } = require('./distribution.service');
+const { returnAllFundsToMaster } = require('./return.service');
 const SchedulerTypes = require('../enums/schedulerTypes');
-const { rescheduleSingleJob } = require('../../src/scheduler/agenda');
+const { rescheduleSingleJob } = require('../scheduler/agenda');
 
 async function runSchedulerTask(schedulerName) {
   // Find the scheduler configuration by name
@@ -40,13 +40,12 @@ async function runSchedulerTask(schedulerName) {
         .populate('masterWallet')
         .populate('pool');
       for (const config of distConfigs) {
-        console.log(`Distributing tokens for network ${config}`);
         const count = await distributeToActiveWallets(config);
         console.log(`Distributed ${count} tokens for network ${config.chainId}`);
         affectedRows += count || 0;
       }
 
-      const returnConfigs = await DistReturnConfig.find({ returnEnabled: true })
+      const returnConfigs = await DistReturnConfig.find({ returnEnabled: true, returnAfter: { $lt: new Date() } })
         .populate('token0')
         .populate('token1')
         .populate('pool');

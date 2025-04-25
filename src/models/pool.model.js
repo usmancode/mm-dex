@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const { toJSON, paginate } = require('./plugins');
 const ProtocolTypes = require('../enums/protocolTypes');
-const { required } = require('joi');
 
 /**
  * Schema for storing DeFi liquidity pool information

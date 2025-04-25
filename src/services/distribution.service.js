@@ -1,7 +1,7 @@
 const { ethers } = require('ethers');
 const config = require('../config/config');
 const WalletGenerationConfig = require('../models/walletGenerationConfig.model');
-const { getHDWallet } = require('./walletService');
+const { getHDWallet } = require('./wallet.service');
 const Wallet = require('../models/wallet.model');
 const WalletUsage = require('../models/walletUsage.model');
 const Transaction = require('../models/transaction.model');

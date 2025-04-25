@@ -1,4 +1,4 @@
-const { generateAddresses } = require('./walletService');
+const { generateAddresses } = require('./wallet.service');
 
 /**
  * Generates wallet addresses based on the wallet generation configuration.

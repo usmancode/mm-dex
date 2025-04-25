@@ -7,9 +7,10 @@ const { getUniswapV3PoolBalances } = require('../utils/priceFetcher');
 const TransactionService = require('../services/transaction.service');
 const TxnStatus = require('../enums/txnStatus');
 const TxnTypes = require('../enums/txnTypes');
-const TransferService = require('../services/transferService');
-const { getWalletIdByAddress, getGasStationWallet, getDerivedWallet } = require('../services/walletService');
+const TransferService = require('../services/transfer.service');
+const { getWalletIdByAddress, getGasStationWallet, getDerivedWallet } = require('../services/wallet.service');
 const BalanceService = require('../services/balance.service');
+const Pool = require('../models/pool.model');
 
 async function approveToken(tokenAddress, tokenABI, amount, signerWallet, swapRouterAddress, chainId, poolId) {
   if (!amount || typeof amount === 'undefined') {
@@ -190,7 +191,11 @@ exports.executeTrade = async (
 
       // 2) Ensure we have enough gas (native token) in the wallet
       const currentGasBalance = await BalanceService.balanceOf(null, signer.address, protocolName, true);
-      if (currentGasBalance < config[protocol].minNativeForGas) {
+      const minGasBalance = await Pool.findById(poolId).then((pool) => pool.minNativeForGas);
+      const minNativeForGas = Number(minGasBalance.toString());
+
+      console.log('minGasBalance', minNativeForGas);
+      if (currentGasBalance < minNativeForGas) {
         const gasStationWallet = await getGasStationWallet();
         const derivedGasStationWallet = await getDerivedWallet(gasStationWallet);
         await TransferService.refillGasForWallet(
@@ -198,7 +203,7 @@ exports.executeTrade = async (
           derivedGasStationWallet,
           gasStationWallet._id,
           signer.address,
-          config[protocol].minNativeForGas,
+          minNativeForGas,
           chainId,
           poolId
         );
