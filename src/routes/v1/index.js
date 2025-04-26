@@ -1,16 +1,17 @@
 const express = require('express');
 const docsRoute = require('./docs.route');
-const tradeRoute = require('./trade.route'); // Import your trade route
-const distReturnConfigRoute = require('./distReturnConfig.route'); // Import distReturnConfig route
-const transactionRoute = require('./transaction.route'); // Add this line
-const cryptoTokenRoute = require('./cryptoToken.route'); // Import cryptoToken route
-const schedulerConfigRoute = require('./schedulerConfig.route'); // Import SchedulerConfig route
-const walletGenerationConfigRoute = require('./walletGenerationConfig.route'); // Import WalletGenerationConfig route
-const poolRoute = require('./pool.route'); // Import pool route
+const tradeRoute = require('./trade.route');
+const distReturnConfigRoute = require('./distReturnConfig.route');
+const transactionRoute = require('./transaction.route');
+const cryptoTokenRoute = require('./cryptoToken.route');
+const schedulerConfigRoute = require('./schedulerConfig.route');
+const walletGenerationConfigRoute = require('./walletGenerationConfig.route');
+const poolRoute = require('./pool.route');
 const walletRoute = require('./wallet.route');
 const config = require('../../config/config');
-const { apiKeyAuth } = require('../../middlewares/auth'); // Import apiKeyAuth
-const balanceRoute = require('./balance.route'); // Import balance route
+const { apiKeyAuth } = require('../../middlewares/auth');
+const balanceRoute = require('./balance.route');
+const priceRoute = require('./price.route');
 
 const router = express.Router();
 const devRoutes = [
@@ -20,7 +21,6 @@ const devRoutes = [
     route: docsRoute,
   },
 ];
-/* istanbul ignore next */
 if (config.env === 'development') {
   devRoutes.forEach((route) => {
     router.use(route.path, route.route);
@@ -64,6 +64,10 @@ const defaultRoutes = [
   {
     path: '/wallets',
     route: walletRoute,
+  },
+  {
+    path: '/price',
+    route: priceRoute,
   },
 ];
 

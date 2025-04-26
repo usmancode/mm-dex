@@ -72,7 +72,6 @@ const transactionSchema = mongoose.Schema(
 
 transactionSchema.index({ createdAt: -1 });
 transactionSchema.index({ wallet: 1, status: 1 });
-transactionSchema.index({ status: 1 });
 
 transactionSchema.plugin(toJSON);
 transactionSchema.plugin(paginate);
