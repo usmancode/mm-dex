@@ -12,12 +12,6 @@ const router = express.Router();
  *     Pool:
  *       type: object
  *       properties:
- *         id:
- *           type: string
- *           description: Pool ID
- *         name:
- *           type: string
- *           description: Name of the pool
  *         token0:
  *           type: string
  *           description: tokenId of Token A
@@ -28,31 +22,21 @@ const router = express.Router();
  *           type: string
  *           description: Address of the pool contract
  *         protocol:
- *           type: string
+ *           type: Enum
+ *           enum: [uniswap, quickswap]
  *           description: Protocol used for the pool (e.g., Uniswap, Sushiswap)
  *         chainId:
- *           type: string
+ *           type: number
  *           description: Chain ID where the pool is deployed
  *         feeTier:
- *           type: integer
+ *           type: number
  *           description: Fee tier for the pool (e.g., 0.3%, 1%)
  *         slippageTolerance:
  *           type: number
  *           description: Slippage tolerance percentage
- *         isActive:
- *           type: boolean
- *           description: Indicates if the pool is active
  *         minNativeForGas:
  *           type: number
  *           description: Minimum native currency required for gas fees
- *         createdAt:
- *           type: string
- *           format: date-time
- *           description: Pool creation timestamp
- *         updatedAt:
- *           type: string
- *           format: date-time
- *           description: Pool last update timestamp
  *       required:
  *         - token0
  *         - token1
@@ -61,7 +45,6 @@ const router = express.Router();
  *         - chainId
  *         - feeTier
  *         - slippageTolerance
- *         - isActive
  *         - minNativeForGas
  */
 

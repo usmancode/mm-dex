@@ -1,5 +1,6 @@
 const httpStatus = require('http-status');
 const CryptoToken = require('../models/cryptoToken.model');
+
 const createCryptoToken = async (req, res) => {
   const cryptoToken = await CryptoToken.create(req.body);
   return res.status(httpStatus.CREATED).send(cryptoToken);

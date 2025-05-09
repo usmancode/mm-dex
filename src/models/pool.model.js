@@ -5,6 +5,7 @@ const ProtocolTypes = require('../enums/protocolTypes');
 /**
  * Schema for storing DeFi liquidity pool information
  */
+const decimalFields = ['minNativeForGas', 'tvlUsd'];
 const poolSchema = mongoose.Schema(
   {
     poolAddress: {
@@ -72,6 +73,18 @@ const poolSchema = mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: {
+      virtuals: true,
+      versionKey: false,
+      transform: (doc, ret) => {
+        decimalFields.forEach((field) => {
+          if (ret[field] instanceof mongoose.Types.Decimal128) {
+            ret[field] = parseFloat(ret[field].toString());
+          }
+        });
+        return ret;
+      },
+    },
   }
 );
 

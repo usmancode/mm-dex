@@ -1,3 +1,4 @@
+const { name } = require('agenda/dist/agenda/name');
 const Joi = require('joi');
 
 const createPool = {
@@ -5,12 +6,15 @@ const createPool = {
     poolAddress: Joi.string().required(),
     protocol: Joi.string().required(),
     chainId: Joi.number().required(),
-    token0: Joi.string().required(),
-    token1: Joi.string().required(),
+    token0: Joi.string()
+      .regex(/^[0-9a-fA-F]{24}$/, 'Should be valid ObjectId')
+      .required(),
+    token1: Joi.string()
+      .regex(/^[0-9a-fA-F]{24}$/, 'Should be valid ObjectId')
+      .required(),
     feeTier: Joi.number().required(),
     slippageTolerance: Joi.number().required(),
     minNativeForGas: Joi.number().required(),
-    active: Joi.boolean().default(false),
     tvlUsd: Joi.number(),
   }),
 };
@@ -29,8 +33,8 @@ const updatePool = {
     poolAddress: Joi.string(),
     protocol: Joi.string(),
     chainId: Joi.number(),
-    token0: Joi.string(),
-    token1: Joi.string(),
+    token0: Joi.string().regex(/^[0-9a-fA-F]{24}$/, 'Should be valid ObjectId'),
+    token1: Joi.string().regex(/^[0-9a-fA-F]{24}$/, 'Should be valid ObjectId'),
     feeTier: Joi.number(),
     slippageTolerance: Joi.number(),
     minNativeForGas: Joi.number(),
