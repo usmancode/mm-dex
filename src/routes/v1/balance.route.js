@@ -162,8 +162,8 @@ const router = express.Router();
  * @swagger
  * /balances/wallet-token-balances:
  *   get:
- *     summary: Get wallet balances for two tokens
- *     description: Retrieve list of wallets with their balances for tokenA and tokenB
+ *     summary: Get wallet balances for two tokens by chainId
+ *     description: Retrieve list of wallets with their balances for tokenA and tokenB by chainId
  *     tags: [Balances]
  *     security:
  *       - apiKey: []
@@ -180,6 +180,12 @@ const router = express.Router();
  *           type: string
  *         required: true
  *         description: Contract address of second token
+ *       - in: query
+ *         name: chainId
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Chain ID
  *       - in: query
  *         name: page
  *         schema:

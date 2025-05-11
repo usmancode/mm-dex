@@ -46,58 +46,64 @@ const listBalances = async (req, res) => {
 };
 
 const getWalletTokenBalances = async (req, res) => {
-  const { tokenA, tokenB, page = 1, limit = 10 } = req.query;
+  try {
+    const { tokenA, tokenB, chainId, page = 1, limit = 10 } = req.query;
 
-  if (!tokenA || !tokenB) {
-    return res.status(400).json({ message: 'Both tokenA and tokenB are required' });
-  }
-
-  // Find both tokens
-  const [tokenAInfo, tokenBInfo] = await Promise.all([
-    CryptoToken.findOne({ tokenAddress: tokenA }),
-    CryptoToken.findOne({ tokenAddress: tokenB }),
-  ]);
-
-  if (!tokenAInfo || !tokenBInfo) {
-    return res.status(404).json({ message: 'One or both tokens not found' });
-  }
-
-  // Get all wallets with pagination and default sort by updatedAt
-  const wallets = await Wallet.paginate(
-    {},
-    {
-      page,
-      limit,
-      sort: { updatedAt: -1 },
-      lean: true, // Use lean for better performance
+    if (!tokenA || !tokenB || !chainId) {
+      return res.status(400).json({ message: 'tokenA, tokenB and chainId are required' });
     }
-  );
 
-  // Get balances for all wallets for both tokens
-  const walletBalances = await Promise.all(
-    wallets.results.map(async (wallet) => {
-      const [balanceA, balanceB] = await Promise.all([
-        Balance.findOne({ wallet: wallet._id, token: tokenAInfo._id }).sort({ updatedAt: -1 }),
-        Balance.findOne({ wallet: wallet._id, token: tokenBInfo._id }).sort({ updatedAt: -1 }),
-      ]);
+    // Find both tokens
+    const [tokenAInfo, tokenBInfo] = await Promise.all([
+      CryptoToken.findOne({ tokenAddress: tokenA }),
+      CryptoToken.findOne({ tokenAddress: tokenB }),
+    ]);
 
-      return {
-        address: wallet.address,
-        tokenABalance: balanceA ? balanceA.balance.toString() : '0',
-        tokenBBalance: balanceB ? balanceB.balance.toString() : '0',
-        status: wallet.status,
-        updatedAt: wallet.updatedAt, // Include the last updated timestamp
-      };
-    })
-  );
+    if (!tokenAInfo || !tokenBInfo) {
+      return res.status(404).json({ message: 'One or both tokens not found' });
+    }
 
-  res.json({
-    results: walletBalances,
-    page: wallets.page,
-    limit: wallets.limit,
-    totalPages: wallets.totalPages,
-    totalResults: wallets.totalResults,
-  });
+    // Get all wallets with pagination and default sort by updatedAt
+    const wallets = await Wallet.paginate(
+      {}, // Empty filter to get all wallets
+      {
+        page,
+        limit,
+        sort: { updatedAt: -1 },
+        lean: true, // Use lean for better performance
+      }
+    );
+
+    // Get balances for all wallets for both tokens and native balance
+    const walletBalances = await Promise.all(
+      wallets.results.map(async (wallet) => {
+        const [balanceA, balanceB, nativeBalance] = await Promise.all([
+          Balance.findOne({ wallet: wallet._id, token: tokenAInfo._id }).sort({ updatedAt: -1 }),
+          Balance.findOne({ wallet: wallet._id, token: tokenBInfo._id }).sort({ updatedAt: -1 }),
+          Balance.findOne({ isNative: true, chainId: chainId }).sort({ updatedAt: -1 }),
+        ]);
+        return {
+          address: wallet.address,
+          tokenABalance: balanceA ? balanceA.balance.toString() : '0',
+          tokenBBalance: balanceB ? balanceB.balance.toString() : '0',
+          nativeBalance: nativeBalance ? nativeBalance.balance.toString() : '0',
+          status: wallet.status,
+          updatedAt: wallet.updatedAt,
+        };
+      })
+    );
+
+    res.json({
+      results: walletBalances,
+      page: wallets.page,
+      limit: wallets.limit,
+      totalPages: wallets.totalPages,
+      totalResults: wallets.totalResults,
+    });
+  } catch (error) {
+    console.error('Error in getWalletTokenBalances:', error);
+    return res.status(500).json({ message: error.message });
+  }
 };
 
 module.exports = {
