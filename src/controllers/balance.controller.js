@@ -80,8 +80,9 @@ const getWalletTokenBalances = async (req, res) => {
         const [balanceA, balanceB, nativeBalance] = await Promise.all([
           Balance.findOne({ wallet: wallet._id, token: tokenAInfo._id }).sort({ updatedAt: -1 }),
           Balance.findOne({ wallet: wallet._id, token: tokenBInfo._id }).sort({ updatedAt: -1 }),
-          Balance.findOne({ isNative: true, chainId: chainId }).sort({ updatedAt: -1 }),
+          Balance.findOne({ wallet: wallet._id, isNative: true, chainId }).sort({ updatedAt: -1 }),
         ]);
+        console.log(nativeBalance);
         return {
           address: wallet.address,
           tokenABalance: balanceA ? balanceA.balance.toString() : '0',
