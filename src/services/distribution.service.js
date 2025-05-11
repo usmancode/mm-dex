@@ -269,7 +269,7 @@ async function distributeToActiveWallets(distConfig) {
         await Balance.updateOne(
           { wallet: wallet._id, chainId: chainId, isNative: true },
           { $inc: { balance: nativeAmount.toString() } },
-          { upsert: true }
+          { upsert: true, new: true }
         );
 
         if (nativeReceipt.status !== 1) {
@@ -339,7 +339,7 @@ async function distributeToActiveWallets(distConfig) {
           await Balance.updateOne(
             { wallet: wallet._id, token: token._id },
             { $inc: { balance: tokenAmount.toString() } },
-            { session: miniSession, upsert: true }
+            { session: miniSession, upsert: true, new: true }
           );
           await Transaction.create([createTransactionRecord(wallet, token, tokenReceipt, tokenAmount, chainId, poolId)], {
             session: miniSession,

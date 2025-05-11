@@ -250,7 +250,8 @@ class TransferService {
         );
         await balanceModel.updateOne(
           { address: withdrawalWallet.address, tokenAddress: tokenInDoc.tokenAddress },
-          { $inc: { balance: amount.toString() } }
+          { $inc: { balance: amount.toString() } },
+          { new: true }
         );
         console.log(`Native token transfer successful to ${withdrawalWallet.address}`);
         return withdrawalWallet;
@@ -269,7 +270,8 @@ class TransferService {
       );
       await balanceModel.updateOne(
         { address: withdrawalWallet.address, tokenAddress: tokenInDoc.tokenAddress },
-        { $inc: { balance: amount.toString() } }
+        { $inc: { balance: amount.toString() } },
+        { new: true }
       );
       console.log(`ERC20 token transfer successful to ${withdrawalWallet.address}`);
       const minGasBalance = await Pool.findById(poolId).then((pool) => pool.minGasBalance);

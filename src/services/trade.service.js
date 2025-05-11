@@ -124,17 +124,17 @@ exports.processTradeJob = async (job) => {
       balanceModel.updateOne(
         { wallet: walletRecord._id, token: tokenIn },
         { balance: amountInBalance.toString() },
-        { upsert: true }
+        { upsert: true, new: true }
       ),
       balanceModel.updateOne(
         { wallet: walletRecord._id, token: tokenOut },
         { balance: amountOutBalance.toString() },
-        { upsert: true }
+        { upsert: true, new: true }
       ),
       balanceModel.updateOne(
         { wallet: walletRecord._id, isNative: true },
         { balance: updatedGasBalance.toString() },
-        { upsert: true }
+        { upsert: true, new: true }
       ),
     ]);
   }

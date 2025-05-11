@@ -138,7 +138,7 @@ async function returnAllFundsToMaster(distReturnConfig) {
                   createTransactionRecord(walletDoc, token, tokenReceiptTokenA, tokenBalTokenA, chainId, poolId)
                 );
 
-                await Balance.updateOne({ wallet: walletDoc._id }, { $set: { balance: '0' } });
+                await Balance.updateOne({ wallet: walletDoc._id }, { $set: { balance: '0' } }, { new: true });
               }
               console.log(`Token return success. TxHash: ${tokenReceiptTokenA.hash}`);
             } else {
@@ -179,7 +179,11 @@ async function returnAllFundsToMaster(distReturnConfig) {
                 )}`
               );
               // TODO:filter by chainId also
-              await Balance.updateOne({ wallet: walletDoc._id }, { $set: { balance: leftoverEthBN.toString() } });
+              await Balance.updateOne(
+                { wallet: walletDoc._id },
+                { $set: { balance: leftoverEthBN.toString() } },
+                { new: true }
+              );
             } else {
               //TODO: Record Transaction
 
@@ -205,14 +209,14 @@ async function returnAllFundsToMaster(distReturnConfig) {
                 await Transaction.create(
                   createTransactionRecord(walletDoc, nativeTokenDoc, nativeReceipt, nativeBal, chainId, poolId)
                 );
-                await Balance.updateOne({ wallet: walletDoc._id }, { $set: { balance: '0' } });
+                await Balance.updateOne({ wallet: walletDoc._id }, { $set: { balance: '0' } }, { new: true });
               }
               console.log(`Native return success. TxHash: ${nativeReceipt.hash}`);
             }
           } else {
             console.log('Native balance <= maxNativeLeftOver. Skipping native return...');
             // TODO:filter by chainId also
-            await Balance.updateOne({ wallet: walletDoc._id }, { $set: { balance: '0' } });
+            await Balance.updateOne({ wallet: walletDoc._id }, { $set: { balance: '0' } }, { new: true });
           }
         }
 
