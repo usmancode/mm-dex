@@ -203,49 +203,6 @@ const router = express.Router();
  *       500:
  *         description: Internal server error
  *
- * /wallets/{address}:
- *   get:
- *     summary: Get wallet by address
- *     description: Returns detailed information about a specific wallet by its address
- *     tags:
- *       - Wallets
- *     security:
- *       - apiKey: []
- *     parameters:
- *       - in: path
- *         name: address
- *         required: true
- *         schema:
- *           type: string
- *         description: The wallet address to search for
- *     responses:
- *       200:
- *         description: Wallet details
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 address:
- *                   type: string
- *                 aggregateBuyWeight:
- *                   type: number
- *                 aggregateSellWeight:
- *                   type: number
- *                 aggregateVolume:
- *                   type: number
- *                 type:
- *                   type: string
- *                 walletGenerationConfig:
- *                   type: string
- *                 status:
- *                   type: string
- *                 id:
- *                   type: string
- *       404:
- *         description: Wallet not found
- *       500:
- *         description: Internal server error
  */
 
 router.get('/', listWallets);
