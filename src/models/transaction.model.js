@@ -64,6 +64,8 @@ const transactionSchema = mongoose.Schema(
         ret.id = ret._id;
         delete ret._id;
         delete ret.__v;
+        ret.createdAt = doc.createdAt;
+        ret.updatedAt = doc.updatedAt;
         return ret;
       },
     },
