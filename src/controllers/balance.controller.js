@@ -82,7 +82,6 @@ const getWalletTokenBalances = async (req, res) => {
           Balance.findOne({ wallet: wallet._id, token: tokenBInfo._id }).sort({ updatedAt: -1 }),
           Balance.findOne({ wallet: wallet._id, isNative: true, chainId }).sort({ updatedAt: -1 }),
         ]);
-        console.log(nativeBalance);
         return {
           address: wallet.address,
           tokenABalance: balanceA ? balanceA.balance.toString() : '0',
