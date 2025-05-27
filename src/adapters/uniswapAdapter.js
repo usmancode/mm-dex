@@ -153,7 +153,6 @@ exports.executeTrade = async (
   slippageTolerance,
   tokenIn,
   tokenOut,
-  protocol,
   poolAddress,
   chainId,
   feeTier,

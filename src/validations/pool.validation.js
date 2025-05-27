@@ -1,5 +1,5 @@
-const { name } = require('agenda/dist/agenda/name');
 const Joi = require('joi');
+const mongoose = require('mongoose');
 
 const createPool = {
   body: Joi.object().keys({
@@ -14,7 +14,17 @@ const createPool = {
       .required(),
     feeTier: Joi.number().required(),
     slippageTolerance: Joi.number().required(),
-    minNativeForGas: Joi.number().required(),
+    minNativeForGas: Joi.any()
+      .custom((value, helpers) => {
+        try {
+          const stringValue = value.toString();
+          new mongoose.Types.Decimal128(stringValue);
+          return stringValue;
+        } catch (error) {
+          return helpers.error('any.invalid');
+        }
+      })
+      .required(),
     tvlUsd: Joi.number(),
   }),
 };
@@ -37,7 +47,16 @@ const updatePool = {
     token1: Joi.string().regex(/^[0-9a-fA-F]{24}$/, 'Should be valid ObjectId'),
     feeTier: Joi.number(),
     slippageTolerance: Joi.number(),
-    minNativeForGas: Joi.number(),
+    minNativeForGas: Joi.any().custom((value, helpers) => {
+      try {
+        // Convert to string and then to Decimal128 to validate
+        const stringValue = value.toString();
+        new mongoose.Types.Decimal128(stringValue);
+        return stringValue; // Return the string value
+      } catch (error) {
+        return helpers.error('any.invalid');
+      }
+    }),
     active: Joi.boolean(),
     tvlUsd: Joi.number(),
   }),

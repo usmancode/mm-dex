@@ -19,8 +19,14 @@ const updateConfig = catchAsync(async (req, res) => {
   res.send(config);
 });
 
+const deleteConfig = catchAsync(async (req, res) => {
+  await walletGenConfigService.deleteConfigById(req.params.id);
+  res.status(httpStatus.NO_CONTENT).send();
+});
+
 module.exports = {
   createConfig,
   listConfigs,
   updateConfig,
+  deleteConfig,
 };

@@ -102,7 +102,6 @@ exports.processTradeJob = async (job) => {
     pool.slippageTolerance,
     tokenInDoc,
     tokenOutDoc,
-    protocol,
     pool.poolAddress,
     pool.chainId,
     pool.feeTier,

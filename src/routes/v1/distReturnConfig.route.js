@@ -41,22 +41,102 @@ module.exports = router;
  *           schema:
  *             type: object
  *             required:
- *               - configName
- *               - configValue
+ *               - network
+ *               - chainId
+ *               - activePoolSize
+ *               - nativeDistributionAmount
+ *               - tokenDistributionAmount
+ *               - minNativeDistributionAmount
+ *               - maxNativeDistributionAmount
+ *               - minTokenDistributionAmount
+ *               - maxTokenDistributionAmount
+ *               - maxNativeLeftOver
+ *               - maxTokenLeftOver
+ *               - returnEnabled
+ *               - pool
+ *               - masterWallet
+ *               - returnAfter
+ *               - expireAt
+ *               - token0
  *             properties:
- *               configName:
+ *               network:
  *                 type: string
- *                 description: Unique configuration name
- *               configValue:
- *                 type: object
- *                 description: Configuration values object
+ *                 description: Name of the network (e.g., ETHEREUM, BSC)
+ *               chainId:
+ *                 type: string
+ *                 description: Blockchain chain ID
+ *               activePoolSize:
+ *                 type: number
+ *                 description: Number of wallets in the active pool for distribution
+ *               nativeDistributionAmount:
+ *                 type: number
+ *                 description: Total native funds (e.g., ETH) allocated for distribution
+ *               tokenDistributionAmount:
+ *                 type: number
+ *                 description: Total token funds allocated for distribution
+ *               minNativeDistributionAmount:
+ *                 type: number
+ *                 description: Minimum native amount to transfer per wallet
+ *               maxNativeDistributionAmount:
+ *                 type: number
+ *                 description: Maximum native amount to transfer per wallet
+ *               minTokenDistributionAmount:
+ *                 type: number
+ *                 description: Minimum token amount to transfer per wallet
+ *               maxTokenDistributionAmount:
+ *                 type: number
+ *                 description: Maximum token amount to transfer per wallet
+ *               maxNativeLeftOver:
+ *                 type: number
+ *                 description: How much native leftover is allowed in the wallet after distribution/return
+ *               maxTokenLeftOver:
+ *                 type: number
+ *                 description: How much token leftover is allowed in the wallet after distribution/return
+ *               returnEnabled:
+ *                 type: boolean
+ *                 description: Whether returning of funds is currently enabled
+ *               pool:
+ *                 type: string
+ *                 description: Reference to the pool doc to use for distribution/returns
  *               enabled:
  *                 type: boolean
- *                 default: true
+ *                 description: Whether distribution is currently enabled
+ *               masterWallet:
+ *                 type: string
+ *                 description: Reference to the wallet doc to use as the master wallet for distribution/returns
+ *               returnAfter:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Date/time after which funds can be returned to master wallet
+ *               expireAt:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Distribution configuration expiration date and time
+ *               token0:
+ *                 type: string
+ *                 description: Reference to the Token A configuration
+ *               token1:
+ *                 type: string
+ *                 description: Reference to the Token B configuration (optional)
  *             example:
- *               configName: premiumReturns
- *               configValue: { tier1: 0.15, tier2: 0.20 }
- *               enabled: true
+ *               network: "ETHEREUM"
+ *               chainId: "1"
+ *               activePoolSize: 100
+ *               nativeDistributionAmount: 0.01
+ *               tokenDistributionAmount: 0.001
+ *               minNativeDistributionAmount: 0.001
+ *               maxNativeDistributionAmount: 0.1
+ *               minTokenDistributionAmount: 0.001
+ *               maxTokenDistributionAmount: 0.1
+ *               maxNativeLeftOver: 0.001
+ *               maxTokenLeftOver: 0.001
+ *               returnEnabled: true
+ *               pool: "60d21b4667d0d8992e610c85"
+ *               masterWallet: "60d21b4667d0d8992e610c86"
+ *               returnAfter: "2024-12-31T23:59:59Z"
+ *               expireAt: "2024-12-31T23:59:59Z"
+ *               token0: "60d21b4667d0d8992e610c87"
+ *               token1: "60d21b4667d0d8992e610c88"
  *     responses:
  *       "201":
  *         description: Created
@@ -79,16 +159,6 @@ module.exports = router;
  *       - apiKey: []
  *     parameters:
  *       - in: query
- *         name: configName
- *         schema:
- *           type: string
- *         description: Configuration name filter
- *       - in: query
- *         name: enabled
- *         schema:
- *           type: boolean
- *         description: Filter by active status
- *       - in: query
  *         name: sortBy
  *         schema:
  *           type: string
@@ -107,6 +177,16 @@ module.exports = router;
  *           minimum: 1
  *           default: 1
  *         description: Page number
+ *       - in: query
+ *         name: enabled
+ *         schema:
+ *           type: boolean
+ *         description: Filter by active status
+ *       - in: query
+ *         name: configName
+ *         schema:
+ *           type: string
+ *         description: Configuration name filter
  *     responses:
  *       "200":
  *         description: OK
@@ -244,18 +324,15 @@ module.exports = router;
  *         _id:
  *           type: string
  *           description: Unique identifier
- *         configName:
+ *         network:
  *           type: string
- *           description: Unique configuration name
- *         configValue:
- *           type: object
- *           description: Configuration values object
- *         createdAt:
+ *           description: Name of the network (e.g., ETHEREUM, BSC)
+ *         chainId:
  *           type: string
- *           format: date-time
- *         updatedAt:
- *           type: string
- *           format: date-time
+ *           description: Blockchain chain ID
+ *         activePoolSize:
+ *           type: number
+ *           description: Number of wallets in the active pool for distribution
  *         nativeDistributionAmount:
  *           type: number
  *           description: Total native funds (e.g., ETH) allocated for distribution
@@ -274,23 +351,67 @@ module.exports = router;
  *         maxTokenDistributionAmount:
  *           type: number
  *           description: Maximum token amount to transfer per wallet
- *         activePoolSize:
+ *         maxNativeLeftOver:
  *           type: number
- *           description: Number of wallets in the active pool for distribution
+ *           description: How much native leftover is allowed in the wallet after distribution/return
+ *         maxTokenLeftOver:
+ *           type: number
+ *           description: How much token leftover is allowed in the wallet after distribution/return
+ *         returnEnabled:
+ *           type: boolean
+ *           description: Whether returning of funds is currently enabled
+ *         pool:
+ *           type: string
+ *           description: Reference to the pool doc to use for distribution/returns
+ *         enabled:
+ *           type: boolean
+ *           description: Whether distribution is currently enabled
+ *         masterWallet:
+ *           type: string
+ *           description: Reference to the wallet doc to use as the master wallet for distribution/returns
+ *         returnAfter:
+ *           type: string
+ *           format: date-time
+ *           description: Date/time after which funds can be returned to master wallet
+ *         expireAt:
+ *           type: string
+ *           format: date-time
+ *           description: Distribution configuration expiration date and time
+ *         token0:
+ *           type: string
+ *           description: Reference to the Token A configuration
+ *         token1:
+ *           type: string
+ *           description: Reference to the Token B configuration (optional)
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
  *       example:
  *         _id: "60d21b4667d0d8992e610c85"
- *         configName: "premiumReturns"
- *         configValue: { "tier1": 0.15, "tier2": 0.20 }
- *         enabled: true
- *         createdAt: "2023-01-01T00:00:00.000Z"
- *         updatedAt: "2023-01-01T00:00:00.000Z"
+ *         network: "ETHEREUM"
+ *         chainId: "1"
+ *         activePoolSize: 100
  *         nativeDistributionAmount: 0.01
  *         tokenDistributionAmount: 0.001
  *         minNativeDistributionAmount: 0.001
  *         maxNativeDistributionAmount: 0.1
  *         minTokenDistributionAmount: 0.001
  *         maxTokenDistributionAmount: 0.1
- *         activePoolSize: 100
+ *         maxNativeLeftOver: 0.001
+ *         maxTokenLeftOver: 0.001
+ *         returnEnabled: true
+ *         pool: "60d21b4667d0d8992e610c85"
+ *         enabled: true
+ *         masterWallet: "60d21b4667d0d8992e610c86"
+ *         returnAfter: "2024-12-31T23:59:59Z"
+ *         expireAt: "2024-12-31T23:59:59Z"
+ *         token0: "60d21b4667d0d8992e610c87"
+ *         token1: "60d21b4667d0d8992e610c88"
+ *         createdAt: "2024-01-01T00:00:00.000Z"
+ *         updatedAt: "2024-01-01T00:00:00.000Z"
  */
 
 /**

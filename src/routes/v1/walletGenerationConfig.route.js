@@ -142,6 +142,22 @@ const router = express.Router();
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/WalletGenerationConfig'
+ *   delete:
+ *     summary: Delete a wallet generation config
+ *     description: Delete a specific wallet generation config by ID.
+ *     tags: [WalletGenerationConfig]
+ *     security:
+ *      - apiKey: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The wallet generation config ID.
+ *     responses:
+ *       204:
+ *         description: Wallet generation config deleted successfully.
  */
 
 router
@@ -149,6 +165,9 @@ router
   .get(walletGenConfigController.listConfigs)
   .post(validate(walletGenConfigValidation.createConfig), walletGenConfigController.createConfig);
 
-router.route('/:id').patch(validate(walletGenConfigValidation.updateConfig), walletGenConfigController.updateConfig);
+router
+  .route('/:id')
+  .patch(validate(walletGenConfigValidation.updateConfig), walletGenConfigController.updateConfig)
+  .delete(walletGenConfigController.deleteConfig);
 
 module.exports = router;

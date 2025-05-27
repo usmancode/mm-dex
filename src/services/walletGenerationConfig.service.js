@@ -12,8 +12,13 @@ const updateConfigById = async (id, updateBody) => {
   return WalletGenerationConfig.findByIdAndUpdate(id, updateBody, { new: true });
 };
 
+const deleteConfigById = async (id) => {
+  return WalletGenerationConfig.findByIdAndDelete(id);
+};
+
 module.exports = {
   createConfig,
   queryConfigs,
   updateConfigById,
+  deleteConfigById,
 };
