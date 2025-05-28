@@ -1,5 +1,10 @@
 const express = require('express');
-const { createCryptoToken, getCryptoTokens, updateCryptoToken } = require('../../controllers/cryptoToken.controller');
+const {
+  createCryptoToken,
+  getCryptoTokens,
+  updateCryptoToken,
+  deleteCryptoToken,
+} = require('../../controllers/cryptoToken.controller');
 
 const router = express.Router();
 
@@ -93,7 +98,25 @@ router.route('/').get(getCryptoTokens).post(createCryptoToken);
  *     responses:
  *       200:
  *         description: Crypto token updated successfully
+ *   delete:
+ *     tags:
+ *       - Tokens
+ *     security:
+ *       - apiKey: []
+ *     summary: Delete a crypto token
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: CryptoToken ID to delete
+ *         schema:
+ *           type: string
+ *     responses:
+ *       204:
+ *         description: Crypto token deleted successfully
+ *       404:
+ *         description: Crypto token not found
  */
-router.route('/:id').patch(updateCryptoToken);
+router.route('/:id').patch(updateCryptoToken).delete(deleteCryptoToken);
 
 module.exports = router;

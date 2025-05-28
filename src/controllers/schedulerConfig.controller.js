@@ -29,8 +29,27 @@ const updateSchedulerConfig = catchAsync(async (req, res) => {
   res.send(schedulerConfig);
 });
 
+const deleteSchedulerConfig = catchAsync(async (req, res) => {
+  try {
+    const schedulerConfig = await schedulerConfigService.deleteSchedulerConfigById(req.params.schedulerConfigId);
+    if (!schedulerConfig) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'SchedulerConfig not found');
+    }
+    res.status(httpStatus.NO_CONTENT).send();
+  } catch (error) {
+    if (error.message === 'Cannot delete scheduler config as it is referenced in other collections') {
+      return res.status(httpStatus.CONFLICT).send({
+        message: error.message,
+        references: error.references,
+      });
+    }
+    throw error;
+  }
+});
+
 module.exports = {
   createSchedulerConfig,
   getSchedulerConfigs,
   updateSchedulerConfig,
+  deleteSchedulerConfig,
 };

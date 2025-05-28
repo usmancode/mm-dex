@@ -20,8 +20,18 @@ const updateConfig = catchAsync(async (req, res) => {
 });
 
 const deleteConfig = catchAsync(async (req, res) => {
-  await walletGenConfigService.deleteConfigById(req.params.id);
-  res.status(httpStatus.NO_CONTENT).send();
+  try {
+    await walletGenConfigService.deleteConfigById(req.params.id);
+    res.status(httpStatus.NO_CONTENT).send();
+  } catch (error) {
+    if (error.message === 'Cannot delete wallet generation config as it is referenced in other collections') {
+      return res.status(httpStatus.CONFLICT).send({
+        message: error.message,
+        references: error.references,
+      });
+    }
+    throw error;
+  }
 });
 
 module.exports = {

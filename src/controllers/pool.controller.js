@@ -73,6 +73,12 @@ const deletePool = async (req, res, next) => {
     }
     res.status(httpStatus.NO_CONTENT).send();
   } catch (error) {
+    if (error.message === 'Cannot delete pool as it is referenced in other collections') {
+      return res.status(httpStatus.CONFLICT).send({
+        message: error.message,
+        references: error.references,
+      });
+    }
     next(error);
   }
 };

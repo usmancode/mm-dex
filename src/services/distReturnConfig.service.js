@@ -4,7 +4,10 @@ const createDistReturnConfig = async (payload) => {
 };
 
 const queryDistReturnConfigs = async (filter, options) => {
-  const result = await DistReturnConfig.paginate(filter, options);
+  const result = await DistReturnConfig.paginate(filter, {
+    ...options,
+    populate: 'pool masterWallet',
+  });
   return result;
 };
 

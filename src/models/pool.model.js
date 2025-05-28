@@ -1,6 +1,9 @@
 const mongoose = require('mongoose');
 const { toJSON, paginate } = require('./plugins');
 const ProtocolTypes = require('../enums/protocolTypes');
+const WalletUsage = require('./walletUsage.model');
+const DistReturnConfig = require('./distReturnConfig.model');
+const Transaction = require('./transaction.model');
 
 /**
  * Schema for storing DeFi liquidity pool information
@@ -91,6 +94,62 @@ const poolSchema = mongoose.Schema(
 // Add JSON transformation & pagination plugin
 poolSchema.plugin(toJSON);
 poolSchema.plugin(paginate);
+
+// Pre-remove middleware to check for references
+poolSchema.pre('remove', async function (next) {
+  const poolId = this._id;
+
+  try {
+    // Check for references in other collections
+    const [walletUsageRefs, distReturnConfigRefs, transactionRefs] = await Promise.all([
+      WalletUsage.findOne({ pool: poolId }),
+      DistReturnConfig.findOne({ pool: poolId }),
+      Transaction.findOne({ poolId: poolId }),
+    ]);
+
+    if (walletUsageRefs || distReturnConfigRefs || transactionRefs) {
+      const error = new Error('Cannot delete pool as it is referenced in other collections');
+      error.references = {
+        hasWalletUsageReferences: !!walletUsageRefs,
+        hasDistReturnConfigReferences: !!distReturnConfigRefs,
+        hasTransactionReferences: !!transactionRefs,
+      };
+      return next(error);
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Also add pre-findOneAndDelete middleware for findOneAndDelete operations
+poolSchema.pre('findOneAndDelete', async function (next) {
+  const poolId = this.getQuery()._id;
+
+  try {
+    // Check for references in other collections
+    const [walletUsageRefs, distReturnConfigRefs, transactionRefs] = await Promise.all([
+      WalletUsage.findOne({ pool: poolId }),
+      DistReturnConfig.findOne({ pool: poolId }),
+      Transaction.findOne({ poolId: poolId }),
+    ]);
+
+    if (walletUsageRefs || distReturnConfigRefs || transactionRefs) {
+      const error = new Error('Cannot delete pool as it is referenced in other collections');
+      error.references = {
+        hasWalletUsageReferences: !!walletUsageRefs,
+        hasDistReturnConfigReferences: !!distReturnConfigRefs,
+        hasTransactionReferences: !!transactionRefs,
+      };
+      return next(error);
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 const Pool = mongoose.model('Pool', poolSchema);
 module.exports = Pool;

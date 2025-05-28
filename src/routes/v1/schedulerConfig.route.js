@@ -158,11 +158,32 @@ const router = express.Router();
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/SchedulerConfig'
+ *   delete:
+ *     summary: Delete a scheduler config
+ *     description: Delete a specific scheduler config by ID.
+ *     tags: [SchedulerConfig]
+ *     security:
+ *      - apiKey: []
+ *     parameters:
+ *       - in: path
+ *         name: schedulerConfigId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The scheduler config ID to delete.
+ *     responses:
+ *       204:
+ *         description: Scheduler config deleted successfully.
+ *       404:
+ *         description: Scheduler config not found.
  */
 
 router.route('/').get(schedulerConfigController.getSchedulerConfigs).post(schedulerConfigController.createSchedulerConfig);
 
 // PATCH: Update a specific SchedulerConfig
-router.route('/:schedulerConfigId').patch(schedulerConfigController.updateSchedulerConfig);
+router
+  .route('/:schedulerConfigId')
+  .patch(schedulerConfigController.updateSchedulerConfig)
+  .delete(schedulerConfigController.deleteSchedulerConfig);
 
 module.exports = router;

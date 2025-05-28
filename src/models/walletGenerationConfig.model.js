@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { toJSON, paginate } = require('./plugins');
+const Wallet = require('./wallet.model');
 
 const walletGenerationConfigSchema = mongoose.Schema(
   {
@@ -30,6 +31,50 @@ const walletGenerationConfigSchema = mongoose.Schema(
     timestamps: true,
   }
 );
+
+// Pre-remove middleware to check for references
+walletGenerationConfigSchema.pre('remove', async function (next) {
+  const configId = this._id;
+
+  try {
+    // Check for references in other collections
+    const walletRefs = await Wallet.findOne({ walletGenerationConfig: configId });
+
+    if (walletRefs) {
+      const error = new Error('Cannot delete wallet generation config as it is referenced in other collections');
+      error.references = {
+        hasWalletReferences: true,
+      };
+      return next(error);
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Also add pre-findOneAndDelete middleware for findOneAndDelete operations
+walletGenerationConfigSchema.pre('findOneAndDelete', async function (next) {
+  const configId = this.getQuery()._id;
+
+  try {
+    // Check for references in other collections
+    const walletRefs = await Wallet.findOne({ walletGenerationConfig: configId });
+
+    if (walletRefs) {
+      const error = new Error('Cannot delete wallet generation config as it is referenced in other collections');
+      error.references = {
+        hasWalletReferences: true,
+      };
+      return next(error);
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 walletGenerationConfigSchema.plugin(toJSON);
 walletGenerationConfigSchema.plugin(paginate);
