@@ -12,7 +12,7 @@ const queryDistReturnConfigs = async (filter, options) => {
 };
 
 const getDistReturnConfigById = async (id) => {
-  return DistReturnConfig.findById(id);
+  return DistReturnConfig.findById(id).populate('pool masterWallet');
 };
 
 const updateDistReturnConfigById = async (id, updateBody) => {

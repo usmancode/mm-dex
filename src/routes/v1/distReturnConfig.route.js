@@ -239,7 +239,34 @@ module.exports = router;
  *         content:
  *           application/json:
  *             schema:
- *                $ref: '#/components/schemas/DistReturnConfig'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/DistReturnConfig'
+ *                 - type: object
+ *                   properties:
+ *                     pool:
+ *                       type: object
+ *                       properties:
+ *                         _id:
+ *                           type: string
+ *                         name:
+ *                           type: string
+ *                         token0:
+ *                           type: string
+ *                         token1:
+ *                           type: string
+ *                         active:
+ *                           type: boolean
+ *                     masterWallet:
+ *                       type: object
+ *                       properties:
+ *                         _id:
+ *                           type: string
+ *                         address:
+ *                           type: string
+ *                         type:
+ *                           type: string
+ *                         status:
+ *                           type: string
  *       "401":
  *         $ref: '#/components/responses/Unauthorized'
  *       "403":
