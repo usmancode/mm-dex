@@ -63,15 +63,21 @@ exports.processTradeJob = async (job) => {
   const tokenIn = tokenInDoc.id;
   const tokenOut = tokenOutDoc.id;
   const protocol = pool.protocol.toLowerCase();
+
+  // Format the amount using the token's decimals
+  const formattedAmount = Number(amount).toFixed(tokenInDoc.decimals);
+
   if (action === 'buy') {
     const maxTokenIn = await getUniswapV3PoolBalances(
       pool.poolAddress,
       tokenInDoc.tokenAddress,
       tokenOutDoc.tokenAddress,
-      Number(amount),
+      Number(formattedAmount),
       'BUY'
     );
     amount = maxTokenIn.toFixed(tokenInDoc.decimals);
+  } else {
+    amount = formattedAmount;
   }
   let walletRecord = await getEligibleWalletForTrade(tokenIn, amount, tokenInDoc.decimals);
   if (!walletRecord) {
