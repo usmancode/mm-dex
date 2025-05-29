@@ -9,6 +9,7 @@ const WalletTypes = require('../enums/walletTypes');
 const Wallet = require('../models/wallet.model');
 const BalanceService = require('./balance.service');
 const Pool = require('../models/pool.model');
+const { getUniswapV3PoolBalances } = require('../utils/priceFetcher');
 
 const { getDerivedWallet, getGasStationWallet } = require('./wallet.service');
 
@@ -48,7 +49,7 @@ const initialChecks = (pool) => {
 };
 
 exports.processTradeJob = async (job) => {
-  const { action, amount, poolId } = job.data;
+  let { action, amount, poolId } = job.data;
 
   const pool = await Pool.findById(poolId).populate('token0 token1');
 
@@ -62,7 +63,16 @@ exports.processTradeJob = async (job) => {
   const tokenIn = tokenInDoc.id;
   const tokenOut = tokenOutDoc.id;
   const protocol = pool.protocol.toLowerCase();
-
+  if (action === 'buy') {
+    const maxTokenIn = await getUniswapV3PoolBalances(
+      pool.poolAddress,
+      tokenInDoc.tokenAddress,
+      tokenOutDoc.tokenAddress,
+      Number(amount),
+      'BUY'
+    );
+    amount = maxTokenIn.toFixed(tokenInDoc.decimals);
+  }
   let walletRecord = await getEligibleWalletForTrade(tokenIn, amount, tokenInDoc.decimals);
   if (!walletRecord) {
     walletRecord = await triggerEmergencyRebalance(protocol, tokenInDoc, tokenOutDoc, amount, chainId);

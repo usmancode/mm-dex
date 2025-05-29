@@ -12,7 +12,8 @@ async function getPriceData(action, poolId, amountHuman) {
       pool.poolAddress,
       tokenIn.tokenAddress,
       tokenOut.tokenAddress,
-      Number(amountHuman)
+      Number(amountHuman),
+      action
     );
 
     const amountOutMinStr = toFixedString(amountOutMin);

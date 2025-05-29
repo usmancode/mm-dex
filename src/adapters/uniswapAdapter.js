@@ -126,7 +126,8 @@ async function calculateSwapAmounts(poolAddress, tokenIn, tokenOut, amountHuman,
     poolAddress,
     tokenIn.tokenAddress,
     tokenOut.tokenAddress,
-    Number(amountHuman)
+    Number(amountHuman),
+    'SELL'
   );
 
   const amountOutMinStr = toFixedString(amountOutMin);

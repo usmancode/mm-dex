@@ -3,7 +3,7 @@ const config = require('../config/config');
 
 const ERC20_ABI = require('../config/abis/TrumpToken.json');
 
-async function getUniswapV3PoolBalances(poolAddress, tokenIn, tokenOut, amountHuman) {
+async function getUniswapV3PoolBalances(poolAddress, tokenIn, tokenOut, amountHuman, action) {
   try {
     const provider = new ethers.JsonRpcProvider(config.rpc.quicknode);
     const token0Address = tokenIn;
@@ -19,8 +19,11 @@ async function getUniswapV3PoolBalances(poolAddress, tokenIn, tokenOut, amountHu
     ]);
     const balance0 = ethers.formatUnits(balance0Raw, decimals0);
     const balance1 = ethers.formatUnits(balance1Raw, decimals1);
+    if (action === 'BUY') {
+      const deltaY = computeDeltaY(balance1, balance0, amountHuman);
+      return deltaY;
+    }
     const deltaY = computeDeltaY(balance0, balance1, amountHuman);
-    console.log('deltaY:', deltaY);
     return deltaY;
   } catch (error) {
     console.error('Error fetching pool balances:', error);
