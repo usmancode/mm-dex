@@ -45,7 +45,7 @@ module.exports = router;
  * /trade:
  *   post:
  *     summary: Initiate a token trade
- *     description: Execute a token swap using specified pool
+ *     description: Execute a token swap using specified pool. The amount parameter always represents TokenB (token1) in the pool.
  *     tags: [Trades]
  *     security:
  *       - apiKey: []
