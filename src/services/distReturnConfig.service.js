@@ -6,13 +6,13 @@ const createDistReturnConfig = async (payload) => {
 const queryDistReturnConfigs = async (filter, options) => {
   const result = await DistReturnConfig.paginate(filter, {
     ...options,
-    populate: 'pool masterWallet',
+    populate: 'pool masterWallet token0 token1',
   });
   return result;
 };
 
 const getDistReturnConfigById = async (id) => {
-  return DistReturnConfig.findById(id).populate('pool masterWallet');
+  return DistReturnConfig.findById(id).populate('pool masterWallet token0 token1');
 };
 
 const updateDistReturnConfigById = async (id, updateBody) => {
